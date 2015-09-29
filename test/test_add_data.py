@@ -11,7 +11,7 @@ from __future__ import (absolute_import, division, print_function)
 import numpy as np
 import pytest
 
-from pyugrid.ugrid import UGrid, DataSet
+from pyugrid import DataSet
 from pyugrid.test_examples import two_triangles
 
 

@@ -11,8 +11,9 @@ from __future__ import (absolute_import, division, print_function)
 import numpy as np
 import netCDF4
 
-from pyugrid.ugrid import UGrid, DataSet
+from pyugrid import DataSet, UGrid
 from pyugrid.test_examples import two_triangles, twenty_one_triangles
+
 
 # code to check netcdf files for stuff:
 def nc_has_variable(ds, var_name):
@@ -415,6 +416,3 @@ if __name__ == "__main__":
     test_write_with_depths()
     test_write_with_velocities()
     test_write_with_edge_data()
-   
-
- 

@@ -1,12 +1,17 @@
-# Conda recipe example.
+# tdk: return version
 package:
     name: pyugrid
-    version: "0.1.5"
+    version: flexible_mesh
+#    version: master
+#    version: 0.1.6
 
+# tdk: return to upstream
 source:
-    fn: pyugrid-0.1.5.tar.gz
-    url: https://pypi.python.org/packages/source/p/pyugrid/pyugrid-0.1.5.tar.gz
-    md5: d8d69f117a6ef4179bdd5a2cc1eb1b6c
+    git_url: https://github.com/NESII/pyugrid
+    git_tag: flexible-mesh
+#    git_url: https://github.com/pyugrid/pyugrid
+#    git_tag: 0.1.6
+#    git_tag: master
 
 build:
     number: 0
@@ -20,6 +25,11 @@ requirements:
         - numpy
         - netcdf4
         - scipy
+        - shapely
+        - fiona
+        - libgdal <2
+        - mpi4py
+        - rtree
 
 test:
     imports:
