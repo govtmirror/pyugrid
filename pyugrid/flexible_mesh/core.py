@@ -22,9 +22,15 @@ class FlexibleMesh(UGrid):
 
     @UGrid.faces.setter
     def faces(self, faces_indexes):
+        # tdk: update doc for ragged array
         # Flexible meshes have varying node counts. Faces with less nodes than the maximum are masked.
         if faces_indexes is not None:
-            self._faces = np.ma.array(faces_indexes, dtype=IND_DT)
+            try:
+                self._faces = np.ma.array(faces_indexes, dtype=IND_DT)
+            except ValueError:
+                # Likely an object array for ragged array usage.
+                if faces_indexes.dtype == object:
+                    self._faces = faces_indexes
         else:
             self._faces = None
             # Other things are no longer valid.
@@ -32,7 +38,7 @@ class FlexibleMesh(UGrid):
             self._face_edge_connectivity = None
 
     @classmethod
-    def from_shapefile(cls, path, name_uid, mesh_name='mesh', path_rtree=None, pack=False):
+    def from_shapefile(cls, path, name_uid, mesh_name='mesh', path_rtree=None, pack=False, use_ragged_arrays=False):
         """
         Create a flexible mesh from a target shapefile.
 
@@ -56,11 +62,11 @@ class FlexibleMesh(UGrid):
         :type pack: bool
         :rtype: :class:`pyugrid.flexible_mesh.core.FlexibleMesh`
         """
-
+        # tdk: update doc
         from helpers import GeometryManager, get_variables
 
         gm = GeometryManager(name_uid, path=path, path_rtree=path_rtree)
-        result = get_variables(gm, pack=pack)
+        result = get_variables(gm, pack=pack, use_ragged_arrays=use_ragged_arrays)
         if MPI_RANK == 0:
             face_nodes, face_edges, edge_nodes, node_x, node_y, face_links, face_ids, face_coordinates = result
             nodes = np.hstack((node_x.reshape(-1, 1), node_y.reshape(-1, 1)))

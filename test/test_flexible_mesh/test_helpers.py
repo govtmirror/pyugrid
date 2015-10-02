@@ -57,8 +57,10 @@ class TestHelpers(AbstractFlexibleMeshTest):
         records, schema, name_uid = self.tdata_records_three
         self.write_fiona(shp_path_three_polygons, records, schema)
 
-        for pack in [True, False]:
-            result = get_variables(gm, pack=pack)
+        keywords = dict(pack=[True, False], use_ragged_arrays=[True, False])
+
+        for k in self.iter_product_keywords(keywords):
+            result = get_variables(gm, pack=k.pack, use_ragged_arrays=k.use_ragged_arrays)
 
             if MPI_RANK == 0:
                 face_nodes, face_edges, edge_nodes, node_x, node_y, face_links, face_ids, face_coordinates = result
@@ -67,7 +69,7 @@ class TestHelpers(AbstractFlexibleMeshTest):
                 self.assertEqual(face_coordinates.shape, (3, 2))
 
                 # There are three shared nodes in this example.
-                actual = 10 if pack else 13
+                actual = 10 if k.pack else 13
                 self.assertEqual(node_x.shape[0], actual)
 
                 out_shp = self.get_temporary_file_path('reconstructed.shp')
@@ -78,7 +80,14 @@ class TestHelpers(AbstractFlexibleMeshTest):
                         uid = record['properties']['SPECIAL']
                         self.assertEqual(uid, face_ids[idx])
                         actual_geom = record['geom']
-                        node_indices = face_nodes[idx].compressed()
+
+                        try:
+                            node_indices = face_nodes[idx].compressed()
+                        except AttributeError:
+                            # Likely a ragged array.
+                            self.assertTrue(k.use_ragged_arrays)
+                            node_indices = face_nodes[idx]
+
                         # Last node is not repeated in UGRID data.
                         len_exterior_coords = len(actual_geom.exterior.coords)
                         self.assertEqual(len_exterior_coords - 1, len(node_indices))

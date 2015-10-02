@@ -25,6 +25,7 @@ class TestFlexibleMesh(AbstractFlexibleMeshTest):
             # allow_multipolygons=(True, False),
             pack=(True, False),
             path_rtree=(None, '_create'),
+            use_ragged_arrays=[False, True]
         )
 
         for k in self.iter_product_keywords(keywords):
@@ -40,6 +41,7 @@ class TestFlexibleMesh(AbstractFlexibleMeshTest):
                 create_rtree_file(rtree_gm, rtree_path)
                 kwargs['path_rtree'] = rtree_path
             kwargs['pack'] = k.pack
+            kwargs['use_ragged_arrays'] = k.use_ragged_arrays
 
             res = FlexibleMesh.from_shapefile(*args, **kwargs)
             self.assertIsInstance(res, FlexibleMesh)
