@@ -71,6 +71,9 @@ grid_defs = [{'grid_attr': 'faces',  # Name in UGrid object.
               'role': 'edge_node_connectivity',  # Name in mesh variable.
               'num_ind': 2,  # Number of idx (3 for faces, 2 for segments).
               },
+             {'grid_attr': 'face_edge_connectivity',
+              'role': 'face_edge_connectivity',
+              'num_ind': 2}
              ]
 # Definitions for various coordinate arrays.
 coord_defs = [{'grid_attr': 'nodes',  # Name in UGrid object.

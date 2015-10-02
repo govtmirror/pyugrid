@@ -635,9 +635,10 @@ class UGrid(object):
                     # Optional attribute.
                     coord = "{0}_face_lon {0}_face_lat".format
                     mesh.face_coordinates = coord(mesh_name)
+            face_edges_variable_name = mesh_name + "_face_edges"
             if self.face_edge_connectivity is not None:
                 # Optional attribute (requires edge_node_connectivity).
-                mesh.face_edge_connectivity = mesh_name + "_face_edges"
+                mesh.face_edge_connectivity = face_edges_variable_name
             if self.face_face_connectivity is not None:
                 # Optional attribute.
                 mesh.face_face_connectivity = mesh_name + "_face_links"
@@ -649,13 +650,15 @@ class UGrid(object):
             if self.faces is not None:
                 nc_create_var = nclocal.createVariable
 
+                has_ragged_arrays = False
                 try:
                     face_nodes = nc_create_var(face_nodes_name, IND_DT,
                                                (dim_num_face_name,
                                                 mesh_name + '_num_vertices'),)
                 except ValueError:
-                    ragged_index_type = nclocal.createVLType(IND_DT, 'ragged_index_type')
+                    ragged_index_type = nclocal.createVLType(IND_DT, mesh_name + '_vltype')
                     face_nodes = nc_create_var(face_nodes_name, ragged_index_type, (dim_num_face_name,))
+                    has_ragged_arrays = True
 
                 face_nodes[:] = self.faces
 
@@ -673,6 +676,18 @@ class UGrid(object):
                 edge_nodes.long_name = ("Maps every edge to the two "
                                         "nodes that it connects.")
                 edge_nodes.start_index = 0
+
+                if self.face_edge_connectivity is not None:
+                    if has_ragged_arrays:
+                        face_edge_connectivity = nc_create_var(face_edges_variable_name, ragged_index_type,
+                                                               (dim_num_face_name,))
+                    else:
+                        face_edge_connectivity = nc_create_var(face_edges_variable_name, IND_DT,
+                                                               (dim_num_face_name, mesh_name + '_num_vertices'))
+                        face_edge_connectivity[:] = self.face_edge_connectivity
+                    face_edge_connectivity.cf_role = "face_edge_connecitivity"
+                    face_edge_connectivity.long_name = "Maps every face to its edges."
+                    face_edge_connectivity.start_index = 0
 
             if self.boundaries is not None:
                 nc_create_var = nclocal.createVariable

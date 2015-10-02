@@ -18,6 +18,7 @@ class TestFlexibleMesh(AbstractFlexibleMeshTest):
         nfaces = {'disjoint': 2, 'single': 1, 'three': 3}
         out_nc_path = self.get_temporary_file_path('out.nc')
         out_shp_path = self.get_temporary_file_path('roundtrip.shp')
+        variable_names = {}
 
         keywords = dict(
             path=shapefiles.iterkeys(),
@@ -45,6 +46,7 @@ class TestFlexibleMesh(AbstractFlexibleMeshTest):
 
             res = FlexibleMesh.from_shapefile(*args, **kwargs)
             self.assertIsInstance(res, FlexibleMesh)
+            self.assertIsNotNone(res.face_edge_connectivity)
 
             # Test all faces are accounted for.
             found = False
@@ -58,11 +60,21 @@ class TestFlexibleMesh(AbstractFlexibleMeshTest):
             # Test writing the mesh back to netCDF.
             res.save_as_netcdf(out_nc_path)
 
+            # Test variables are consistent across ragged_array logic.
+            with self.nc_scope(out_nc_path) as ds:
+                variable_names[k.use_ragged_arrays] = ds.variables.keys()
+
+            #tdk: remove
+            # if 'three' in k.path:
+            #     subprocess.check_call(['ncdump', out_nc_path])
+            #     raise
+
             # Test reading the files back in.
             kwargs_from_ncfile = {'load_data': True}
             if k.mesh_name != '_default':
                 kwargs_from_ncfile['mesh_name'] = k.mesh_name
             res2 = FlexibleMesh.from_ncfile(out_nc_path, **kwargs_from_ncfile)
+            self.assertIsNotNone(res2.face_edge_connectivity)
 
             try:
                 self.assertIsInstance(res2.faces, MaskedArray)
@@ -81,6 +93,9 @@ class TestFlexibleMesh(AbstractFlexibleMeshTest):
             for r in fiona.open(out_shp_path):
                 uids.append(r['properties'][name_uid])
             self.assertTrue((res.data[name_uid].data == uids).all())
+
+        # Test variable names are consistent across ragged arrays.
+        self.assertEqual(*[set(e) for e in variable_names.values()])
 
     def test_iter_records(self):
         path = self.get_temporary_file_path('out.shp')
