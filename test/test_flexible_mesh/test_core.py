@@ -47,6 +47,9 @@ class TestFlexibleMesh(AbstractFlexibleMeshTest):
             res = FlexibleMesh.from_shapefile(*args, **kwargs)
             self.assertIsInstance(res, FlexibleMesh)
             self.assertIsNotNone(res.face_edge_connectivity)
+            if 'three' in k.path:
+                # Test face connectivity is loaded when faces are adjacent.
+                self.assertIsNotNone(res.face_face_connectivity)
 
             # Test all faces are accounted for.
             found = False
@@ -67,7 +70,7 @@ class TestFlexibleMesh(AbstractFlexibleMeshTest):
             #tdk: remove
             # if 'three' in k.path:
             #     subprocess.check_call(['ncdump', out_nc_path])
-            #     raise
+            #     tkk
 
             # Test reading the files back in.
             kwargs_from_ncfile = {'load_data': True}
@@ -75,6 +78,9 @@ class TestFlexibleMesh(AbstractFlexibleMeshTest):
                 kwargs_from_ncfile['mesh_name'] = k.mesh_name
             res2 = FlexibleMesh.from_ncfile(out_nc_path, **kwargs_from_ncfile)
             self.assertIsNotNone(res2.face_edge_connectivity)
+            if 'three' in k.path:
+                # Test face connectivity is loaded when faces are adjacent.
+                self.assertIsNotNone(res2.face_face_connectivity)
 
             try:
                 self.assertIsInstance(res2.faces, MaskedArray)

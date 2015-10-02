@@ -55,6 +55,7 @@ def is_valid_mesh(nc, varname):
 
 # Defining properties of various connectivity arrays
 # so that the same code can load all of them.
+# tdk: not all of these are required, consider adding a required attribute
 grid_defs = [{'grid_attr': 'faces',  # Name in UGrid object.
               'role': 'face_node_connectivity',  # Name in mesh variable.
               'num_ind': 3,  # Number of idx (3 for faces, 2 for segments).
@@ -73,7 +74,7 @@ grid_defs = [{'grid_attr': 'faces',  # Name in UGrid object.
               },
              {'grid_attr': 'face_edge_connectivity',
               'role': 'face_edge_connectivity',
-              'num_ind': 2}
+              'num_ind': 2},
              ]
 # Definitions for various coordinate arrays.
 coord_defs = [{'grid_attr': 'nodes',  # Name in UGrid object.

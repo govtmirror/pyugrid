@@ -666,6 +666,11 @@ class UGrid(object):
                 face_nodes.long_name = "Maps every face to its corner nodes."
                 face_nodes.start_index = 0
 
+                if self.face_face_connectivity is not None:
+                    # tdk: write face_face_connectivity array
+                    raise NotImplementedError
+                    face_links = nc_create_var(mesh_name + "_face_links", IND_DT, ())
+
             if self.edges is not None:
                 nc_create_var = nclocal.createVariable
                 edge_nodes = nc_create_var(mesh_name + "_edge_nodes", IND_DT,
