@@ -1,3 +1,4 @@
+import pyugrid
 
 
 def test_imports_required():
@@ -5,9 +6,6 @@ def test_imports_required():
     Test importing flexible mesh API elements. These API elements requires the installation of optional dependencies.
     """
 
+    assert hasattr(pyugrid, 'FlexibleMesh')
 
-def test_imports_optional():
-    """
-    Test importing API elements using optional dependencies (e.g. shapely).
-    """
 

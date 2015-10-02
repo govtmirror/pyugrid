@@ -25,17 +25,30 @@ class FlexibleMesh(UGrid):
         # tdk: update doc for ragged array
         # Flexible meshes have varying node counts. Faces with less nodes than the maximum are masked.
         if faces_indexes is not None:
-            try:
-                self._faces = np.ma.array(faces_indexes, dtype=IND_DT)
-            except ValueError:
-                # Likely an object array for ragged array usage.
-                if faces_indexes.dtype == object:
-                    self._faces = faces_indexes
+            self._faces = self._format_masked_or_object_array_(faces_indexes)
         else:
             self._faces = None
             # Other things are no longer valid.
             self._face_face_connectivity = None
             self._face_edge_connectivity = None
+
+    @UGrid.face_edge_connectivity.setter
+    def face_edge_connectivity(self, face_edge_connectivity):
+        # Add more checking?
+        if face_edge_connectivity is not None:
+            face_edge_connectivity = self._format_masked_or_object_array_(face_edge_connectivity)
+        self._face_edge_connectivity = face_edge_connectivity
+
+    def _format_masked_or_object_array_(self, faces_indexes):
+        try:
+            ret = np.ma.array(faces_indexes, dtype=IND_DT)
+        except ValueError:
+            # Likely an object array for ragged array usage.
+            if faces_indexes.dtype == object:
+                ret = faces_indexes
+            else:
+                raise
+        return ret
 
     @classmethod
     def from_shapefile(cls, path, name_uid, mesh_name='mesh', path_rtree=None, pack=False, use_ragged_arrays=False):

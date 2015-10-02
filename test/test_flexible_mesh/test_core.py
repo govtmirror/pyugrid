@@ -63,7 +63,14 @@ class TestFlexibleMesh(AbstractFlexibleMeshTest):
             if k.mesh_name != '_default':
                 kwargs_from_ncfile['mesh_name'] = k.mesh_name
             res2 = FlexibleMesh.from_ncfile(out_nc_path, **kwargs_from_ncfile)
-            self.assertIsInstance(res2.faces, MaskedArray)
+
+            try:
+                self.assertIsInstance(res2.faces, MaskedArray)
+            except AssertionError:
+                # Likely using ragged arrays.
+                self.assertTrue(k.use_ragged_arrays)
+                self.assertEqual(res2.faces.dtype, object)
+
             self.assertEqual(res2.faces.shape, res.faces.shape)
             self.assertNumpyAll(res.faces, res2.faces, check_data=False, check_fill_value=False)
 

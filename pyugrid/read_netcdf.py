@@ -199,7 +199,14 @@ def load_grid_from_nc_dataset(nc, grid, mesh_name=None, load_data=True):
                 var = nc.variables[mesh_var.getncattr(defs['role'])]
             except AttributeError:  # This connectivity array isn't there.
                 continue
-            array = var[:, :]
+
+            try:
+                array = var[:, :]
+            except ValueError:
+                # Likely a variable-length data type.
+                assert var._isvlen
+                array = var[:]
+
             # Fortran order, instead of C order, transpose the array
             # logic below will fail for 3 node or two edge grids.
             if grid.check_array_order and array.shape[0] == defs['num_ind']:

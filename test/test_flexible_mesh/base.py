@@ -96,7 +96,13 @@ class AbstractFlexibleMeshTest(TestCase):
             if check_fill_value:
                 self.assertEqual(arr1.fill_value, arr2.fill_value)
         else:
-            self.assertTrue(np.all(arr1 == arr2))
+            try:
+                self.assertTrue(np.all(arr1 == arr2))
+            except AssertionError:
+                # Object arrays require special checking.
+                self.assertEqual(arr1.shape, arr2.shape)
+                for idx in range(arr1.shape[0]):
+                    self.assertNumpyAll(arr1[idx], arr2[idx])
 
     def assertPolygonAlmostEqual(self, a, b):
         self.assertEqual(type(a), type(b))

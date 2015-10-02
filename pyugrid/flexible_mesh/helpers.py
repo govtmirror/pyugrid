@@ -6,6 +6,7 @@ import numpy as np
 import fiona
 from shapely.geometry import shape, mapping, Polygon
 from shapely.geometry.base import BaseMultipartGeometry
+
 from shapely.geometry.polygon import orient
 
 from pyugrid.flexible_mesh.constants import PYUGRID_LINK_ATTRIBUTE_NAME
@@ -184,7 +185,7 @@ def get_variables(gm, pack=False, use_ragged_arrays=False):
 
             # map the node indices for the face
             if use_ragged_arrays:
-                face_nodes[idx_face_nodes] = new_face_nodes
+                face_nodes[idx_face_nodes] = np.array(new_face_nodes, dtype=np.int32)
             else:
                 face_nodes[idx_face_nodes, 0:len(new_face_nodes)] = new_face_nodes
 
@@ -256,7 +257,7 @@ def get_mapped_edges(edge_nodes, face_edges, face_nodes, idx_face_nodes, idx_edg
 
     # update the face-edge mapping
     if use_ragged_arrays:
-        face_edges[idx_face_nodes] = new_face_edges
+        face_edges[idx_face_nodes] = np.array(new_face_edges, dtype=np.int32)
     else:
         face_edges[idx_face_nodes, 0:len(new_face_edges)] = new_face_edges
 
@@ -385,7 +386,13 @@ def iter_records(face_nodes, node_x, node_y, indices_to_load=None, datasets=None
     for feature_idx in feature_indices:
         coordinates = deque()
 
-        current_face_node = face_nodes[feature_idx, :]
+        try:
+            current_face_node = face_nodes[feature_idx, :]
+        except IndexError:
+            # Likely an object array.
+            assert face_nodes.dtype == object
+            current_face_node = face_nodes[feature_idx]
+
         try:
             nodes = current_face_node.compressed()
         except AttributeError:
