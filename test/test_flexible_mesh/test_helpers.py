@@ -41,14 +41,15 @@ class TestHelpers(AbstractFlexibleMeshTest):
     @pytest.mark.mpi4py
     def test_get_face_variables(self):
         gm = GeometryManager('SPECIAL', records=self.tdata_records_three[0])
+        result = get_face_variables(gm)
         if MPI_RANK == 0:
-            Mesh2_face_links, nMaxMesh2_face_nodes, Mesh2_ids, face_coordinates = get_face_variables(gm)
+            Mesh2_face_links, nMaxMesh2_face_nodes, Mesh2_ids, face_coordinates = result
             self.assertEqual(face_coordinates.shape, (3, 2))
             self.assertEqual(Mesh2_ids.tolist(), [100, 101, 102])
             self.assertEqual(nMaxMesh2_face_nodes, 6)
             self.assertEqual(Mesh2_face_links.tolist(), [[0, 1], [1, 0], [1, 2], [2, 1]])
         else:
-            self.assertIsNone(get_face_variables(gm))
+            self.assertIsNone(result)
 
     @pytest.mark.mpi4py
     def test_get_variables(self):

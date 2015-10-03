@@ -6,6 +6,7 @@ import numpy as np
 import fiona
 from shapely.geometry import shape, mapping, Polygon
 from shapely.geometry.base import BaseMultipartGeometry
+
 from shapely.geometry.polygon import orient
 
 from pyugrid.flexible_mesh.constants import PYUGRID_LINK_ATTRIBUTE_NAME
@@ -303,8 +304,9 @@ def get_face_variables(gm):
     Mesh2_ids = np.zeros(section[1] - section[0], dtype=np.int32)
     assert Mesh2_ids.shape[0] > 0
 
-    # tdk: RESUME: this array should have dimension nmesh_face, nmaxfacenodes
+    # tdk: this array should have dimension nmesh_face, nmaxfacenodes
     # tdk: this should be stored as a ragged array
+    # tdk: this should be -1 if the face does not abut any regions
     Mesh2_face_links = deque()
     nMaxMesh2_face_nodes = 0
     face_coordinates = deque()
