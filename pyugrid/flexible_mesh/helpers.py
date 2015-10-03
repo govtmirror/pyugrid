@@ -6,12 +6,11 @@ import numpy as np
 import fiona
 from shapely.geometry import shape, mapping, Polygon
 from shapely.geometry.base import BaseMultipartGeometry
-
 from shapely.geometry.polygon import orient
 
 from pyugrid.flexible_mesh.constants import PYUGRID_LINK_ATTRIBUTE_NAME
 from pyugrid.flexible_mesh.geom_cabinet import GeomCabinetIterator
-from pyugrid.flexible_mesh.mpi import MPI_RANK, create_slices, MPI_COMM, hgather, vgather, MPI_SIZE
+from pyugrid.flexible_mesh.mpi import MPI_RANK, create_slices, MPI_COMM, hgather, vgather, MPI_SIZE, dgather
 from pyugrid.flexible_mesh.logging_ugrid import log
 from pyugrid.flexible_mesh.spatial_index import SpatialIndex
 
@@ -87,6 +86,8 @@ def get_variables(gm, pack=False, use_ragged_arrays=False):
     result = get_face_variables(gm)
 
     if MPI_RANK == 0:
+        # tdk: RESUME: face_links is returned as an object array. if use_ragged_arrays is False, this needs to be
+        #   converted to an array with size (face_count, nmax_face_nodes) with extra elements masked.
         face_links, nmax_face_nodes, face_ids, face_coordinates = result
     else:
         return
@@ -301,20 +302,17 @@ def get_face_variables(gm):
     # Create a spatial index to find touching faces.
     si = gm.get_spatial_index()
 
-    Mesh2_ids = np.zeros(section[1] - section[0], dtype=np.int32)
-    assert Mesh2_ids.shape[0] > 0
+    face_ids = np.zeros(section[1] - section[0], dtype=np.int32)
+    assert face_ids.shape[0] > 0
 
-    # tdk: this array should have dimension nmesh_face, nmaxfacenodes
-    # tdk: this should be stored as a ragged array
-    # tdk: this should be -1 if the face does not abut any regions
-    Mesh2_face_links = deque()
-    nMaxMesh2_face_nodes = 0
+    face_links = {}
+    max_face_nodes = 0
     face_coordinates = deque()
 
     log.debug('section={0} (rank={1})'.format(section, MPI_RANK))
 
     for ctr, (uid_source, record_source) in enumerate(gm.iter_records(return_uid=True, slice=section)):
-        Mesh2_ids[ctr] = uid_source
+        face_ids[ctr] = uid_source
         ref_object = record_source['geom']
 
         # Get representative points for each polygon.
@@ -323,45 +321,58 @@ def get_face_variables(gm):
         # For polygon geometries the first coordinate is repeated at the end of the sequence. UGRID clients do not want
         # repeated coordinates (i.e. ESMF).
         ncoords = len(ref_object.exterior.coords) - 1
-        if ncoords > nMaxMesh2_face_nodes:
-            nMaxMesh2_face_nodes = ncoords
+        if ncoords > max_face_nodes:
+            max_face_nodes = ncoords
 
+        touching = deque()
         for uid_target in iter_touching(si, gm, ref_object):
             # If the objects only touch they are neighbors and may share nodes.
-            Mesh2_face_links.append([uid_source, uid_target])
+            touching.append(uid_target)
+        # If nothing touches the faces, indicate this with a flag value.
+        if len(touching) == 0:
+            touching.append(-1)
+        face_links[uid_source] = touching
 
-    # convert to numpy array for faster comparisons
-    Mesh2_face_links = np.array(Mesh2_face_links, dtype=np.int32)
-
-    Mesh2_ids = MPI_COMM.gather(Mesh2_ids, root=0)
-    nMaxMesh2_face_nodes = MPI_COMM.gather(nMaxMesh2_face_nodes)
-    Mesh2_face_links = MPI_COMM.gather(Mesh2_face_links)
+    face_ids = MPI_COMM.gather(face_ids, root=0)
+    max_face_nodes = MPI_COMM.gather(max_face_nodes)
+    face_links = MPI_COMM.gather(face_links)
     face_coordinates = MPI_COMM.gather(np.array(face_coordinates))
 
     if MPI_RANK == 0:
-        Mesh2_ids = hgather(Mesh2_ids)
+        face_ids = hgather(face_ids)
         face_coordinates = vgather(face_coordinates)
 
-        nMaxMesh2_face_nodes = max(nMaxMesh2_face_nodes)
+        max_face_nodes = max(max_face_nodes)
 
-        # For single element conversion, the links should be empty (i.e. no neighbors).
-        try:
-            Mesh2_face_links = vgather(Mesh2_face_links)
-        except IndexError:
-            if Mesh2_face_links[0].shape[0] == 0:
-                Mesh2_face_links = None
+        face_links = get_mapped_face_links(face_ids, face_links)
+
+        return face_links, max_face_nodes, face_ids, face_coordinates
+
+
+def get_mapped_face_links(face_ids, face_links):
+    """
+    :param face_ids: Vector of unique, integer face identifiers.
+    :type face_ids: ndarray
+    :param face_links: List of dictionaries mapping face unique identifiers to neighbor face unique identifiers.
+    :type face_links: list
+    :returns: A numpy object array with slots containing numpy integer vectors with values equal to neighbor indices.
+    :rtype: ndarray
+    """
+
+    face_links = dgather(face_links)
+    new_face_links = np.zeros(len(face_links), dtype=object)
+    for idx, e in enumerate(face_ids.flat):
+        to_fill = np.zeros(len(face_links[e]), dtype=np.int32)
+        for idx_f, f in enumerate(face_links[e]):
+            # This flag indicates nothing touches the faces. Do not search for this value in the face identifiers.
+            if f == -1:
+                to_fill_value = f
+            # Search for the index location of the face identifier.
             else:
-                raise
-        else:
-            new_face_links = Mesh2_face_links.copy()
-            # Convert face unique identifiers to indices.
-            for ctr, mid in enumerate(Mesh2_ids.flat):
-                for column_index in [0, 1]:
-                    w = np.where(Mesh2_face_links[:, column_index] == mid)[0]
-                    new_face_links[w, column_index] = ctr
-            Mesh2_face_links = new_face_links
-
-        return Mesh2_face_links, nMaxMesh2_face_nodes, Mesh2_ids, face_coordinates
+                to_fill_value = np.where(face_ids == f)[0][0]
+            to_fill[idx_f] = to_fill_value
+        new_face_links[idx] = to_fill
+    return new_face_links
 
 
 def flexible_mesh_to_fiona(out_path, face_nodes, node_x, node_y, crs=None, driver='ESRI Shapefile',

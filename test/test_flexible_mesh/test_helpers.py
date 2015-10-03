@@ -43,13 +43,25 @@ class TestHelpers(AbstractFlexibleMeshTest):
         gm = GeometryManager('SPECIAL', records=self.tdata_records_three[0])
         result = get_face_variables(gm)
         if MPI_RANK == 0:
-            Mesh2_face_links, nMaxMesh2_face_nodes, Mesh2_ids, face_coordinates = result
+            face_links, nmax_face_nodes, face_ids, face_coordinates = result
             self.assertEqual(face_coordinates.shape, (3, 2))
-            self.assertEqual(Mesh2_ids.tolist(), [100, 101, 102])
-            self.assertEqual(nMaxMesh2_face_nodes, 6)
-            self.assertEqual(Mesh2_face_links.tolist(), [[0, 1], [1, 0], [1, 2], [2, 1]])
+            self.assertEqual(face_ids.tolist(), [100, 101, 102])
+            self.assertEqual(nmax_face_nodes, 6)
+            to_test = [f.tolist() for f in face_links.flat]
+            self.assertEqual(to_test, [[1], [0, 2], [1]])
         else:
             self.assertIsNone(result)
+
+    def test_get_face_variables_single_and_disjoint(self):
+        """Test with single and disjoint polygons."""
+
+        for records, schema, name_uid in [self.tdata_records_disjoint, self.tdata_records_single]:
+            gm = GeometryManager(name_uid, records=records)
+            result = get_face_variables(gm)
+            face_links, nmax_face_nodes, face_ids, face_coordinates = result
+            for f in face_links:
+                self.assertEqual(f.shape[0], 1)
+                self.assertEqual(f[0], -1)
 
     @pytest.mark.mpi4py
     def test_get_variables(self):

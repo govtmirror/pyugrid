@@ -46,6 +46,14 @@ def create_slices(length, size=MPI_SIZE):
     return indexes
 
 
+def dgather(elements):
+    grow = elements[0]
+    for idx in range(1, len(elements)):
+        for k, v in elements[idx].iteritems():
+            grow[k] = v
+    return grow
+
+
 def hgather(elements):
     n = sum([e.shape[0] for e in elements])
     fill = np.zeros(n, dtype=elements[0].dtype)
