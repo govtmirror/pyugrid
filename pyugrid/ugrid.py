@@ -601,11 +601,12 @@ class UGrid(object):
                 nclocal.createDimension(mesh_name+'_num_boundary',
                                         len(self.boundaries))
             dim_num_face_name = mesh_name + '_num_face'
+            dim_num_vertices_name = mesh_name + '_num_vertices'
             if self._faces is not None:
                 nclocal.createDimension(dim_num_face_name, len(self.faces))
 
                 try:
-                    nclocal.createDimension(mesh_name+'_num_vertices', self.faces.shape[1])
+                    nclocal.createDimension(dim_num_vertices_name, self.faces.shape[1])
                 except IndexError:
                     # Likely using ragged arrays. The number of vertices is not needed a node arrays have varying sizes
                     # per face.
@@ -653,8 +654,7 @@ class UGrid(object):
                 has_ragged_arrays = False
                 try:
                     face_nodes = nc_create_var(face_nodes_name, IND_DT,
-                                               (dim_num_face_name,
-                                                mesh_name + '_num_vertices'),)
+                                               (dim_num_face_name, dim_num_vertices_name),)
                 except ValueError:
                     ragged_index_type = nclocal.createVLType(IND_DT, mesh_name + '_vltype')
                     face_nodes = nc_create_var(face_nodes_name, ragged_index_type, (dim_num_face_name,))
@@ -667,9 +667,24 @@ class UGrid(object):
                 face_nodes.start_index = 0
 
                 if self.face_face_connectivity is not None:
-                    # tdk: write face_face_connectivity array
-                    raise NotImplementedError
-                    face_links = nc_create_var(mesh_name + "_face_links", IND_DT, ())
+                    if has_ragged_arrays:
+                        face_links = nc_create_var(mesh_name + "_face_links", ragged_index_type,
+                                                   (dim_num_face_name,))
+                    else:
+                        face_links = nc_create_var(mesh_name + "_face_links", IND_DT,
+                                                   (dim_num_face_name, dim_num_vertices_name))
+
+                    # tdk: handle single element arrays
+                    for idx in range(self.face_face_connectivity.shape[0]):
+                        row = self.face_face_connectivity[idx]
+                        face_links[idx] = np.array(row)
+                    # face_links[:] = self.face_face_connectivity
+
+                    face_links.cf_role = "face_face_connectivity"
+                    face_links.long_name = "Indicates which other faces neighbor each face."
+                    face_links.start_index = 0
+                    face_links.flag_values = -1
+                    face_links.flag_means = "out_of_mesh"
 
             if self.edges is not None:
                 nc_create_var = nclocal.createVariable
@@ -688,7 +703,7 @@ class UGrid(object):
                                                                (dim_num_face_name,))
                     else:
                         face_edge_connectivity = nc_create_var(face_edges_variable_name, IND_DT,
-                                                               (dim_num_face_name, mesh_name + '_num_vertices'))
+                                                               (dim_num_face_name, dim_num_vertices_name))
                         face_edge_connectivity[:] = self.face_edge_connectivity
                     face_edge_connectivity.cf_role = "face_edge_connecitivity"
                     face_edge_connectivity.long_name = "Maps every face to its edges."

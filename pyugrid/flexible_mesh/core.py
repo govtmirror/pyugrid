@@ -16,8 +16,7 @@ class FlexibleMesh(UGrid):
     @UGrid.face_face_connectivity.setter
     def face_face_connectivity(self, face_face_connectivity):
         if face_face_connectivity is not None:
-            face_face_connectivity = np.asarray(face_face_connectivity,
-                                                dtype=IND_DT)
+            face_face_connectivity = self._format_masked_or_object_array_(face_face_connectivity)
         self._face_face_connectivity = face_face_connectivity
 
     @UGrid.faces.setter

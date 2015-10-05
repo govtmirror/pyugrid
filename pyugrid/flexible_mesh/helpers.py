@@ -5,6 +5,7 @@ import os
 import numpy as np
 import fiona
 from shapely.geometry import shape, mapping, Polygon
+
 from shapely.geometry.base import BaseMultipartGeometry
 
 from shapely.geometry.polygon import orient
@@ -186,6 +187,7 @@ def get_rectangular_array_from_object_array(target, shape):
     for idx, f in enumerate(target):
         new_face_links[idx, 0:f.shape[0]] = f
     face_links = new_face_links
+    assert(face_links.ndim == 2)
     return face_links
 
 

@@ -29,7 +29,10 @@ class TestFlexibleMesh(AbstractFlexibleMeshTest):
             use_ragged_arrays=[False, True]
         )
 
-        for k in self.iter_product_keywords(keywords):
+        for ctr, k in enumerate(self.iter_product_keywords(keywords)):
+            # if ctr != 8:
+            #     continue
+            # print ctr, k
 
             name_uid = shapefiles[k.path]
             args = (k.path, name_uid)
@@ -47,9 +50,13 @@ class TestFlexibleMesh(AbstractFlexibleMeshTest):
             res = FlexibleMesh.from_shapefile(*args, **kwargs)
             self.assertIsInstance(res, FlexibleMesh)
             self.assertIsNotNone(res.face_edge_connectivity)
-            if 'three' in k.path:
-                # Test face connectivity is loaded when faces are adjacent.
-                self.assertIsNotNone(res.face_face_connectivity)
+
+            # Test face connectivity always have values. Flags of -1 are present if faces are not adjacent.
+            self.assertIsNotNone(res.face_face_connectivity)
+            if not k.use_ragged_arrays:
+                self.assertEqual(res.face_face_connectivity.ndim, 2)
+            else:
+                self.assertEqual(res.face_face_connectivity.ndim, 1)
 
             # Test all faces are accounted for.
             found = False
@@ -66,11 +73,6 @@ class TestFlexibleMesh(AbstractFlexibleMeshTest):
             # Test variables are consistent across ragged_array logic.
             with self.nc_scope(out_nc_path) as ds:
                 variable_names[k.use_ragged_arrays] = ds.variables.keys()
-
-            #tdk: remove
-            # if 'three' in k.path:
-            #     subprocess.check_call(['ncdump', out_nc_path])
-            #     tkk
 
             # Test reading the files back in.
             kwargs_from_ncfile = {'load_data': True}
