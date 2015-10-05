@@ -1,14 +1,14 @@
 # tdk: return version
 package:
     name: pyugrid
-    version: flexible_mesh
+    version: ragged_arrays
 #    version: master
 #    version: 0.1.6
 
 # tdk: return to upstream
 source:
     git_url: https://github.com/NESII/pyugrid
-    git_tag: flexible-mesh
+    git_tag: ragged-arrays
 #    git_url: https://github.com/pyugrid/pyugrid
 #    git_tag: 0.1.6
 #    git_tag: master
