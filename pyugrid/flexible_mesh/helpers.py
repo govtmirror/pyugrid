@@ -6,6 +6,7 @@ import numpy as np
 import fiona
 from shapely.geometry import shape, mapping, Polygon
 from shapely.geometry.base import BaseMultipartGeometry
+
 from shapely.geometry.polygon import orient
 
 from pyugrid.flexible_mesh.constants import PYUGRID_LINK_ATTRIBUTE_NAME
@@ -93,11 +94,8 @@ def get_variables(gm, pack=False, use_ragged_arrays=False):
     # the number of faces
     n_face = len(gm)
 
-    if use_ragged_arrays:
-        # Variable-length arrays are stored in an object array.
-        face_nodes = np.zeros(n_face, dtype=object)
-    else:
-        face_nodes = np.ma.array(np.zeros((n_face, nmax_face_nodes), dtype=np.int32), mask=True)
+    # Variable-length arrays are stored in an object array.
+    face_nodes = np.zeros(n_face, dtype=object)
 
     # the edge mapping has the same shape as the node mapping
     face_edges = np.zeros_like(face_nodes)
@@ -137,28 +135,18 @@ def get_variables(gm, pack=False, use_ragged_arrays=False):
             # map the node identifiers for the face
             range_point_idx = range(0, idx_point)
 
-            if use_ragged_arrays:
-                face_nodes[idx_face_nodes] = np.array(range_point_idx, dtype=np.int32)
-            else:
-                face_nodes[idx_face_nodes, 0:idx_point] = range_point_idx
+            # Store the indices in the face nodes object array.
+            face_nodes[idx_face_nodes] = np.array(range_point_idx, dtype=np.int32)
 
             node_indices = np.hstack((node_indices, range_point_idx))
+
             # construct the edges. compress the node slice to remove any masked values at the tail.
-
-            if use_ragged_arrays:
-                to_itr = face_nodes[idx_face_nodes]
-            else:
-                to_itr = face_nodes[idx_face_nodes, :].compressed()
-
-            for start_node_idx, end_node_idx in iter_edge_nodes(to_itr):
+            for start_node_idx, end_node_idx in iter_edge_nodes(face_nodes[idx_face_nodes]):
                 edge_nodes.append((start_node_idx, end_node_idx))
                 idx_edge += 1
 
             # map the edges to faces
-            if use_ragged_arrays:
-                face_edges[idx_face_nodes] = np.array(range(0, idx_edge), dtype=np.int32)
-            else:
-                face_edges[idx_face_nodes, 0:idx_edge] = range(0, idx_edge)
+            face_edges[idx_face_nodes] = np.array(range(0, idx_edge), dtype=np.int32)
 
             # switch the loop flag to indicate the first face has been dealt with
             first = False
@@ -174,32 +162,35 @@ def get_variables(gm, pack=False, use_ragged_arrays=False):
 
             node_indices, node_x, node_y, idx_point = get_mapped_xy(face_nodes, node_indices, node_x, node_y,
                                                                     coordinates, idx_point, neighbor_face_indices,
-                                                                    new_face_nodes, pack=pack,
-                                                                    use_ragged_arrays=use_ragged_arrays)
+                                                                    new_face_nodes, pack=pack)
 
             # map the node indices for the face
-            if use_ragged_arrays:
-                face_nodes[idx_face_nodes] = np.array(new_face_nodes, dtype=np.int32)
-            else:
-                face_nodes[idx_face_nodes, 0:len(new_face_nodes)] = new_face_nodes
+            face_nodes[idx_face_nodes] = np.array(new_face_nodes, dtype=np.int32)
 
             # find and map the edges
-            idx_edge = get_mapped_edges(edge_nodes, face_edges, face_nodes, idx_face_nodes, idx_edge, pack=pack,
-                                        use_ragged_arrays=use_ragged_arrays)
+            idx_edge = get_mapped_edges(edge_nodes, face_edges, face_nodes, idx_face_nodes, idx_edge, pack=pack)
 
-            # Convert face links to rectangular array if use_ragged_arrays is False.
-            if not use_ragged_arrays:
-                new_face_links = np.ma.array(np.zeros_like(face_nodes), mask=True)
-                for idx, f in enumerate(face_links):
-                    new_face_links[idx][0:f.shape[0]] = f
-                face_links = new_face_links
+    # Convert object arrays to rectangular array if use_ragged_arrays is False.
+    if not use_ragged_arrays:
+        new_arrays = []
+        for a in (face_links, face_nodes, face_edges):
+            new_arrays.append(get_rectangular_array_from_object_array(a, (a.shape[0], nmax_face_nodes)))
+        face_links, face_nodes, face_edges = new_arrays
 
     return face_nodes, face_edges, np.array(edge_nodes, dtype=np.int32), node_x, node_y, face_links, face_ids, \
            face_coordinates
 
 
+def get_rectangular_array_from_object_array(target, shape):
+    new_face_links = np.ma.array(np.zeros(shape, dtype=target[0].dtype), mask=True)
+    for idx, f in enumerate(target):
+        new_face_links[idx, 0:f.shape[0]] = f
+    face_links = new_face_links
+    return face_links
+
+
 def get_mapped_xy(face_nodes, node_indices, node_x, node_y, coordinates, idx_point, neighbor_face_indices,
-                  new_face_nodes, pack=False, use_ragged_arrays=False):
+                  new_face_nodes, pack=False):
     for ii in range(coordinates.shape[0]):
         # logic flag to indicate if the point has been found
         found = False
@@ -209,10 +200,7 @@ def get_mapped_xy(face_nodes, node_indices, node_x, node_y, coordinates, idx_poi
             for neighbor_face_index in neighbor_face_indices.flat:
 
                 # search over the neighboring face's nodes
-                if use_ragged_arrays:
-                    neighbor_face_node_indices = face_nodes[neighbor_face_index]
-                else:
-                    neighbor_face_node_indices = face_nodes[neighbor_face_index, :].compressed()
+                neighbor_face_node_indices = face_nodes[neighbor_face_index]
 
                 # for neighbor_face_node_index in compressed:
                 x_equal = np.isclose(coordinates_row[0], node_x[neighbor_face_node_indices])
@@ -237,14 +225,10 @@ def get_mapped_xy(face_nodes, node_indices, node_x, node_y, coordinates, idx_poi
     return node_indices, node_x, node_y, idx_point
 
 
-def get_mapped_edges(edge_nodes, face_edges, face_nodes, idx_face_nodes, idx_edge, pack=False, use_ragged_arrays=False):
+def get_mapped_edges(edge_nodes, face_edges, face_nodes, idx_face_nodes, idx_edge, pack=False):
     new_face_edges = deque()
 
-    if use_ragged_arrays:
-        to_itr = face_nodes[idx_face_nodes]
-    else:
-        to_itr = face_nodes[idx_face_nodes, :].compressed()
-
+    to_itr = face_nodes[idx_face_nodes]
     for start_node_idx, end_node_idx in iter_edge_nodes(to_itr):
         # flag to indicate if edge has been found
         found_edge = False
@@ -257,10 +241,7 @@ def get_mapped_edges(edge_nodes, face_edges, face_nodes, idx_face_nodes, idx_edg
             idx_edge += 1
 
     # update the face-edge mapping
-    if use_ragged_arrays:
-        face_edges[idx_face_nodes] = np.array(new_face_edges, dtype=np.int32)
-    else:
-        face_edges[idx_face_nodes, 0:len(new_face_edges)] = new_face_edges
+    face_edges[idx_face_nodes] = np.array(new_face_edges, dtype=np.int32)
 
     return idx_edge
 

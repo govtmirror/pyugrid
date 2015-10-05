@@ -72,7 +72,7 @@ class TestHelpers(AbstractFlexibleMeshTest):
 
         keywords = dict(pack=[True, False], use_ragged_arrays=[True, False])
 
-        for k in self.iter_product_keywords(keywords):
+        for ctr, k in enumerate(self.iter_product_keywords(keywords)):
             result = get_variables(gm, pack=k.pack, use_ragged_arrays=k.use_ragged_arrays)
 
             if MPI_RANK == 0:
@@ -134,7 +134,13 @@ class TestHelpers(AbstractFlexibleMeshTest):
 
             if MPI_RANK == 0:
                 face_nodes, face_edges, edge_nodes, node_x, node_y, face_links, face_ids, face_coordinates = result
-                self.assertIsNone(face_links)
+
+                self.assertEqual(face_links.shape, face_nodes.shape)
+
+                for idx_f in range(face_links.shape[0]):
+                    self.assertEqual(face_links[idx_f][0], -1)
+                    self.assertTrue(face_links[idx_f].mask[1:].all())
+
                 if s == 'disjoint':
                     shp = (2, 2)
                 else:
