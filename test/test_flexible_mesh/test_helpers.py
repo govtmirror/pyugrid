@@ -78,6 +78,10 @@ class TestHelpers(AbstractFlexibleMeshTest):
             if MPI_RANK == 0:
                 face_nodes, face_edges, edge_nodes, node_x, node_y, face_links, face_ids, face_coordinates = result
 
+                # Test rectangular array returned when use_ragged_arrays=False.
+                if not k.use_ragged_arrays:
+                    self.assertEqual(face_links.shape, (3, face_nodes.shape[1]))
+
                 # There are three faces/elements with an (x, y) for each.
                 self.assertEqual(face_coordinates.shape, (3, 2))
 

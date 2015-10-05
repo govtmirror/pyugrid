@@ -86,8 +86,6 @@ def get_variables(gm, pack=False, use_ragged_arrays=False):
     result = get_face_variables(gm)
 
     if MPI_RANK == 0:
-        # tdk: RESUME: face_links is returned as an object array. if use_ragged_arrays is False, this needs to be
-        #   converted to an array with size (face_count, nmax_face_nodes) with extra elements masked.
         face_links, nmax_face_nodes, face_ids, face_coordinates = result
     else:
         return
@@ -170,12 +168,7 @@ def get_variables(gm, pack=False, use_ragged_arrays=False):
 
             # Only search neighboring faces if there are face links.
             if face_links is not None:
-                neighbor_face_indices = face_links == idx_face_nodes
-                neighbor_face_indices = np.logical_or(neighbor_face_indices[:, 0], neighbor_face_indices[:, 1])
-                neighbor_face_indices = face_links[neighbor_face_indices, :]
-                neighbor_face_indices = neighbor_face_indices.flatten()[
-                    np.where(neighbor_face_indices.flatten() != idx_face_nodes)[0]]
-                neighbor_face_indices = np.unique(neighbor_face_indices)
+                neighbor_face_indices = face_links[idx_face_nodes]
             else:
                 neighbor_face_indices = np.array([])
 
@@ -193,6 +186,13 @@ def get_variables(gm, pack=False, use_ragged_arrays=False):
             # find and map the edges
             idx_edge = get_mapped_edges(edge_nodes, face_edges, face_nodes, idx_face_nodes, idx_edge, pack=pack,
                                         use_ragged_arrays=use_ragged_arrays)
+
+            # Convert face links to rectangular array if use_ragged_arrays is False.
+            if not use_ragged_arrays:
+                new_face_links = np.ma.array(np.zeros_like(face_nodes), mask=True)
+                for idx, f in enumerate(face_links):
+                    new_face_links[idx][0:f.shape[0]] = f
+                face_links = new_face_links
 
     return face_nodes, face_edges, np.array(edge_nodes, dtype=np.int32), node_x, node_y, face_links, face_ids, \
            face_coordinates
