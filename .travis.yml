@@ -7,7 +7,7 @@ env:
 # tdk: enable master when merged
 branches:
   only:
-    - flexible-mesh
+    - ragged-arrays
 #    - master
 
 sudo: false
