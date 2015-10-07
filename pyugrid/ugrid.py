@@ -593,7 +593,7 @@ class UGrid(object):
         from netCDF4 import Dataset as ncDataset
         # Create a new netcdf file.
         with ncDataset(filepath, mode="w", clobber=True) as nclocal:
-
+            # tdk: no need to create num_node and num_edge dimensions when writing ragged arrays
             nclocal.createDimension(mesh_name+'_num_node', len(self.nodes))
             if self._edges is not None:
                 nclocal.createDimension(mesh_name+'_num_edge', len(self.edges))
