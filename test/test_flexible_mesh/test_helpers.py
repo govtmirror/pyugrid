@@ -119,6 +119,16 @@ class TestHelpers(AbstractFlexibleMeshTest):
             else:
                 self.assertIsNone(result)
 
+    def test_get_variables_multipart(self):
+        """Test allowing multipolygons."""
+
+        records, schema, name_uid = self.tdata_records_three
+        mp = MultiPolygon([r['geom'] for r in records])
+        new_records = [{'geom': mp, 'properties': {name_uid: 1000}}]
+        gm = GeometryManager(name_uid, records=new_records, allow_multipart=True)
+        result = get_variables(gm)
+        tkk
+
     @pytest.mark.mpi4py
     def test_get_mesh2_variables_disjoint_and_single(self):
         """Test converting a shapefile that contains two disjoint elements and a single element."""

@@ -4,10 +4,8 @@ import os
 
 import numpy as np
 import fiona
-from shapely.geometry import shape, mapping, Polygon
-
+from shapely.geometry import shape, mapping, Polygon, MultiPolygon
 from shapely.geometry.base import BaseMultipartGeometry
-
 from shapely.geometry.polygon import orient
 
 from pyugrid.flexible_mesh.constants import PYUGRID_LINK_ATTRIBUTE_NAME
@@ -117,11 +115,23 @@ def get_variables(gm, pack=False, use_ragged_arrays=False):
     idx_edge = 0
     # loop through each polygon
     for idx_face_nodes, (fid, record) in enumerate(gm.iter_records(return_uid=True)):
-        coordinates = np.array(record['geom'].exterior.coords)
-        # Assert last coordinate is repeated for each polygon.
-        assert coordinates[0].tolist() == coordinates[-1].tolist()
-        # Remove this repeated coordinate.
-        coordinates = coordinates[0:-1, :]
+        # tdk: optimize
+        try:
+            coordinates = np.array(record['geom'].exterior.coords)
+            # Assert last coordinate is repeated for each polygon.
+            assert coordinates[0].tolist() == coordinates[-1].tolist()
+            # Remove this repeated coordinate.
+            coordinates = coordinates[0:-1, :]
+        except AttributeError:
+            # Likely a multipolygon.
+            coordinates = np.array([]).reshape(0, 2)
+            for e in record['geom']:
+                new_coordinates = np.array(e.exterior.coords)
+                # Assert last coordinate is repeated for each polygon.
+                assert new_coordinates[0].tolist() == new_coordinates[-1].tolist()
+                # Remove this repeated coordinate.
+                new_coordinates = new_coordinates[0:-1, :]
+                coordinates = np.vstack((coordinates, new_coordinates))
 
         # just load everything if this is the first polygon
         if first:
@@ -303,7 +313,13 @@ def get_face_variables(gm):
 
         # For polygon geometries the first coordinate is repeated at the end of the sequence. UGRID clients do not want
         # repeated coordinates (i.e. ESMF).
-        ncoords = len(ref_object.exterior.coords) - 1
+        try:
+            ncoords = len(ref_object.exterior.coords) - 1
+        except AttributeError:
+            # Likely a multipolygon...
+            ncoords = sum([len(e.exterior.coords) - 1 for e in ref_object])
+            # A -1 flag will be placed between elements.
+            ncoords += (len(ref_object) - 1)
         if ncoords > max_face_nodes:
             max_face_nodes = ncoords
 
@@ -357,7 +373,7 @@ def get_mapped_face_links(face_ids, face_links):
         new_face_links[idx] = to_fill
     return new_face_links
 
-
+# tdk: need to support multipolygons
 def flexible_mesh_to_fiona(out_path, face_nodes, node_x, node_y, crs=None, driver='ESRI Shapefile',
                            indices_to_load=None, face_uid=None):
 
@@ -435,7 +451,7 @@ class GeometryManager(object):
     flat files.
     """
 
-    def __init__(self, name_uid, path=None, records=None, path_rtree=None):
+    def __init__(self, name_uid, path=None, records=None, path_rtree=None, allow_multipart=False):
         if path_rtree is not None:
             assert os.path.exists(path_rtree + '.idx')
 
@@ -443,6 +459,7 @@ class GeometryManager(object):
         self.path_rtree = path_rtree
         self.name_uid = name_uid
         self.records = copy(records)
+        self.allow_multipart = allow_multipart
 
         self._has_provided_records = False if records is None else True
 
@@ -476,9 +493,7 @@ class GeometryManager(object):
             self._validate_update_record_(record)
 
             # Counter-clockwise orientations required by clients such as ESMF Mesh regridding.
-            obj = record['geom']
-            if not obj.exterior.is_ccw:
-                record['geom'] = orient(obj)
+            record['geom'] = get_oriented_geometry(record['geom'])
 
             if return_uid:
                 uid = record['properties'][self.name_uid]
@@ -495,7 +510,7 @@ class GeometryManager(object):
         geom = record['geom']
 
         # This should happen before any buffering. The buffering check may result in a single polygon object.
-        if isinstance(geom, BaseMultipartGeometry):
+        if not self.allow_multipart and isinstance(geom, BaseMultipartGeometry):
             msg = 'Only singlepart geometries allowed. Perhaps "ugrid.convert_multipart_to_singlepart" would be useful?'
             raise ValueError(msg)
 
@@ -505,3 +520,25 @@ class GeometryManager(object):
             geom = geom.buffer(0)
             assert geom.is_valid
             record['geom'] = geom
+
+
+def get_oriented_geometry(geom):
+    new_element = geom
+
+    if isinstance(geom, MultiPolygon):
+        #tdk: test orientation of multipolgyon
+        # Orient each element of a multi-geometry.
+        new_element = []
+        for idx, e in enumerate(geom):
+            if not e.exterior.is_ccw:
+                new_element.append(orient(e))
+            else:
+                new_element.append(e)
+        new_element = geom.__class__(new_element)
+    elif isinstance(geom, Polygon):
+        if not geom.exterior.is_ccw:
+            new_element = orient(geom)
+    else:
+        raise NotImplementedError(type(geom))
+
+    return new_element
