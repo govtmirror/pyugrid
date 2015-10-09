@@ -92,7 +92,7 @@ class TestHelpers(AbstractFlexibleMeshTest):
             result = get_variables(gm, pack=k.pack, use_ragged_arrays=k.use_ragged_arrays)
 
             if MPI_RANK == 0:
-                face_nodes, face_edges, edge_nodes, node_x, node_y, face_links, face_ids, face_coordinates = result
+                face_nodes, face_edges, edge_nodes, nodes, face_links, face_ids, face_coordinates = result
 
                 # Test rectangular array returned when use_ragged_arrays=False.
                 if not k.use_ragged_arrays:
@@ -103,7 +103,7 @@ class TestHelpers(AbstractFlexibleMeshTest):
 
                 # There are three shared nodes in this example.
                 actual = 10 if k.pack else 13
-                self.assertEqual(node_x.shape[0], actual)
+                self.assertEqual(nodes.shape[0], actual)
 
                 out_shp = self.get_temporary_file_path('reconstructed.shp')
                 schema = {'geometry': 'Polygon', 'properties': {}}
@@ -124,9 +124,7 @@ class TestHelpers(AbstractFlexibleMeshTest):
                         # Last node is not repeated in UGRID data.
                         len_exterior_coords = len(actual_geom.exterior.coords)
                         self.assertEqual(len_exterior_coords - 1, len(node_indices))
-                        x = node_x[node_indices].reshape(-1, 1)
-                        y = node_y[node_indices].reshape(-1, 1)
-                        xy = np.hstack((x, y))
+                        xy = nodes[node_indices, :]
                         target_polygon = Polygon(xy)
                         to_write = {'geometry': mapping(target_polygon), 'properties': {}}
                         sink.write(to_write)
@@ -158,7 +156,7 @@ class TestHelpers(AbstractFlexibleMeshTest):
         # tdk: RESUME: add conversion back to multipolygon objects and test polygons are equal.
 
     @pytest.mark.mpi4py
-    def test_get_mesh2_variables_disjoint_and_single(self):
+    def test_get_variables_disjoint_and_single(self):
         """Test converting a shapefile that contains two disjoint elements and a single element."""
 
         for s, r in zip(['disjoint', 'single'], [self.tdata_records_disjoint[0], self.tdata_records_single[0]]):
@@ -171,7 +169,7 @@ class TestHelpers(AbstractFlexibleMeshTest):
                 continue
 
             if MPI_RANK == 0:
-                face_nodes, face_edges, edge_nodes, node_x, node_y, face_links, face_ids, face_coordinates = result
+                face_nodes, face_edges, edge_nodes, nodes, face_links, face_ids, face_coordinates = result
 
                 self.assertEqual(face_links.shape, face_nodes.shape)
 
