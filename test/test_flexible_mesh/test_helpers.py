@@ -6,11 +6,11 @@ from numpy.core.multiarray import ndarray
 import pytest as pytest
 from shapely.geometry import Polygon, shape, MultiPolygon, mapping, Point
 
-from pyugrid import DataSet
+from pyugrid import DataSet, FlexibleMesh
 from pyugrid.flexible_mesh.constants import PYUGRID_LINK_ATTRIBUTE_NAME
 from pyugrid.flexible_mesh.geom_cabinet import GeomCabinetIterator
 from pyugrid.flexible_mesh.helpers import convert_multipart_to_singlepart, get_face_variables, get_variables, \
-    iter_records, GeometryManager, create_rtree_file
+    iter_records, GeometryManager, create_rtree_file, flexible_mesh_to_esmf_format
 from pyugrid.flexible_mesh.mpi import MPI_RANK, MPI_SIZE
 from pyugrid.flexible_mesh.spatial_index import SpatialIndex
 from test.test_flexible_mesh.base import AbstractFlexibleMeshTest
@@ -38,6 +38,21 @@ class TestHelpers(AbstractFlexibleMeshTest):
                 self.assertIn(PYUGRID_LINK_ATTRIBUTE_NAME, record['properties'])
                 geom = shape(record['geometry'])
                 self.assertIsInstance(geom, Polygon)
+
+    def test_flexible_mesh_to_esmf_format(self):
+        records, _, name_uid = self.tdata_records_three
+        gm = GeometryManager(name_uid, records=records)
+        fm = FlexibleMesh.from_geometry_manager(gm, use_ragged_arrays=True)
+        path = self.get_temporary_file_path('out.nc')
+        with self.nc_scope(path, 'w') as ds:
+            flexible_mesh_to_esmf_format(fm, ds)
+        with self.nc_scope(path) as ds:
+            res = ds.variables['numElementConn'][:]
+            self.assertEqual(res.tolist(), [4, 3, 6])
+            res = ds.variables['elementConn'][:]
+            res = [e.tolist() for e in res.flat]
+            actual = [[0, 1, 2, 3], [4, 5, 6], [7, 8, 9, 10, 11, 12]]
+            self.assertEqual(res, actual)
 
     @pytest.mark.mpi4py
     def test_get_face_variables(self):
@@ -140,8 +155,7 @@ class TestHelpers(AbstractFlexibleMeshTest):
         self.assertEqual((face_edges[0] == -1).sum(), 2)
         self.assertEqual(face_nodes[0].shape, face_edges[0].shape)
         self.assertNumpyAll(face_nodes[0], face_edges[0])
-        # tdk: add conversion back to multipolygon objects and test polygons are equal.
-        tkk
+        # tdk: RESUME: add conversion back to multipolygon objects and test polygons are equal.
 
     @pytest.mark.mpi4py
     def test_get_mesh2_variables_disjoint_and_single(self):

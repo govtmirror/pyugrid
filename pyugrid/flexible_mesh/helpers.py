@@ -155,20 +155,25 @@ def get_variables(gm, pack=False, use_ragged_arrays=False):
                                     neighbor_face_indices, pack=pack)
                 node_indices, coordinates, idx_point, new_face_nodes = res
 
-
                 # Find and map the edge indices.
                 idx_edge, new_face_edges = get_mapped_edges(edge_nodes, new_face_nodes, idx_edge, pack=pack)
 
                 # If processing a mutlipolygon, and we are on the second or greater element, indicate the break with a
                 # -1 flag.
                 if n_elements > 1 and ctr_element != 0:
+                    is_processing_mulipart = True
                     new_face_nodes.appendleft(-1)
                     new_face_edges.appendleft(-1)
+                else:
+                    is_processing_mulipart = False
 
                 # Update node and edge arrays to account for the new indices.
                 for arr, new_data in zip((face_nodes, face_edges), (new_face_nodes, new_face_edges)):
                     new_data = np.array(new_data, dtype=np.int32)
-                    arr[idx_face_nodes] = np.hstack((arr[idx_face_nodes], new_data))
+                    if is_processing_mulipart:
+                        arr[idx_face_nodes] = np.hstack((arr[idx_face_nodes], new_data))
+                    else:
+                        arr[idx_face_nodes] = new_data
 
     # Convert object arrays to rectangular array if use_ragged_arrays is False.
     if not use_ragged_arrays:
@@ -524,3 +529,49 @@ def get_oriented_and_valid_geometry(geom):
         geom = geom.buffer(0)
         assert geom.is_valid
     return geom
+
+
+def flexible_mesh_to_esmf_format(fm, ds):
+    """
+    :type fm: :class:`pyugrid.flexible_mesh.core.FlexibleMesh`
+    """
+    # tdk: doc
+
+    # Dimensions #######################################################################################################
+
+    node_count = ds.createDimension('nodeCount', fm.nodes.shape[0])
+    element_count = ds.createDimension('elementCount', fm.faces.shape[0])
+    coord_dim = ds.createDimension('coordDim', 2)
+    element_conn_vltype = ds.createVLType(fm.faces[0].dtype, 'elementConnVLType')
+
+    # Variables ########################################################################################################
+
+    node_coords = ds.createVariable('nodeCoords', fm.nodes.dtype, (node_count.name, coord_dim.name))
+    node_coords.units = 'degrees'
+    node_coords[:] = fm.nodes
+
+    element_conn = ds.createVariable('elementConn', element_conn_vltype, (element_count.name,))
+    element_conn.long_name = 'Node indices that define the element connectivity.'
+    element_conn[:] = fm.faces
+
+    num_element_conn = ds.createVariable('numElementConn', np.int64, (element_count.name,))
+    num_element_conn.long_name = 'Number of nodes per element.'
+    num_element_conn[:] = [e.shape[0] for e in fm.faces.flat]
+
+    center_coords = ds.createVariable('centerCoords', fm.face_coordinates.dtype, (element_count.name, coord_dim.name))
+    center_coords.units = 'degrees'
+    center_coords[:] = fm.face_coordinates
+
+    # tdk: compute area required?
+    # element_area = ds.createVariable('elementArea', fm.nodes.dtype, (element_count.name,))
+    # element_area.units = 'degrees'
+    # element_area.long_name = 'area weights'
+
+    # tdk: element mask required?
+    # element_mask = ds.createVariable('elementMask', np.int32, (element_count.name,))
+
+    # Global Attributes ################################################################################################
+
+    ds.gridType = 'unstructured'
+    ds.version = '0.9'
+    setattr(ds, coord_dim.name, "longitude latitude")

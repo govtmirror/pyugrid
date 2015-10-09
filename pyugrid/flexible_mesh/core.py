@@ -50,6 +50,11 @@ class FlexibleMesh(UGrid):
         return ret
 
     @classmethod
+    def from_geometry_manager(cls, gm, mesh_name='mesh', pack=False, use_ragged_arrays=False):
+        # tdk: doc
+        return get_flexible_mesh(gm, mesh_name, pack, use_ragged_arrays)
+
+    @classmethod
     def from_shapefile(cls, path, name_uid, mesh_name='mesh', path_rtree=None, pack=False, use_ragged_arrays=False):
         """
         Create a flexible mesh from a target shapefile.
@@ -75,23 +80,10 @@ class FlexibleMesh(UGrid):
         :rtype: :class:`pyugrid.flexible_mesh.core.FlexibleMesh`
         """
         # tdk: update doc
-        from helpers import GeometryManager, get_variables
+        from helpers import GeometryManager
 
         gm = GeometryManager(name_uid, path=path, path_rtree=path_rtree)
-        result = get_variables(gm, pack=pack, use_ragged_arrays=use_ragged_arrays)
-        if MPI_RANK == 0:
-            face_nodes, face_edges, edge_nodes, node_x, node_y, face_links, face_ids, face_coordinates = result
-            nodes = np.hstack((node_x.reshape(-1, 1), node_y.reshape(-1, 1)))
-            data_attrs = {'long_name': 'Face unique identifiers.'}
-            # TODO (bekozi): necessary to use a dictionary here? key of dictionary is never used.
-            data = {'': DataSet(name_uid, location='face', data=face_ids, attributes=data_attrs)}
-            # TODO (bekozi): add boundaries, boundary_coordinates, and edge_coordinates
-            ret = FlexibleMesh(nodes=nodes, faces=face_nodes, edges=edge_nodes, boundaries=None,
-                               face_face_connectivity=face_links, face_edge_connectivity=face_edges,
-                               edge_coordinates=None, face_coordinates=face_coordinates, boundary_coordinates=None,
-                               data=data, mesh_name=mesh_name)
-        else:
-            ret = None
+        ret = get_flexible_mesh(gm, mesh_name, pack, use_ragged_arrays)
 
         return ret
 
@@ -138,3 +130,22 @@ class FlexibleMesh(UGrid):
             face_uid = None
 
         flexible_mesh_to_fiona(path, self.faces, self.nodes[:, 0], self.nodes[:, 1], face_uid=face_uid)
+
+
+def get_flexible_mesh(gm, mesh_name, pack, use_ragged_arrays):
+    from helpers import get_variables
+
+    result = get_variables(gm, pack=pack, use_ragged_arrays=use_ragged_arrays)
+    if MPI_RANK == 0:
+        face_nodes, face_edges, edge_nodes, nodes, face_links, face_ids, face_coordinates = result
+        data_attrs = {'long_name': 'Face unique identifiers.'}
+        # TODO (bekozi): necessary to use a dictionary here? key of dictionary is never used.
+        data = {'': DataSet(gm.name_uid, location='face', data=face_ids, attributes=data_attrs)}
+        # TODO (bekozi): add boundaries, boundary_coordinates, and edge_coordinates
+        ret = FlexibleMesh(nodes=nodes, faces=face_nodes, edges=edge_nodes, boundaries=None,
+                           face_face_connectivity=face_links, face_edge_connectivity=face_edges,
+                           edge_coordinates=None, face_coordinates=face_coordinates, boundary_coordinates=None,
+                           data=data, mesh_name=mesh_name)
+    else:
+        ret = None
+    return ret
