@@ -2,6 +2,7 @@ import os
 
 import numpy as np
 import fiona
+from numpy.core.multiarray import ndarray
 import pytest as pytest
 from shapely.geometry import Polygon, shape, MultiPolygon, mapping, Point
 
@@ -124,9 +125,22 @@ class TestHelpers(AbstractFlexibleMeshTest):
 
         records, schema, name_uid = self.tdata_records_three
         mp = MultiPolygon([r['geom'] for r in records])
+        self.assertEqual(len(mp), 3)
         new_records = [{'geom': mp, 'properties': {name_uid: 1000}}]
         gm = GeometryManager(name_uid, records=new_records, allow_multipart=True)
-        result = get_variables(gm)
+        for e in gm.iter_records():
+            self.assertEqual(len(e['geom']), 3)
+        result = get_variables(gm, use_ragged_arrays=True, pack=False)
+        face_nodes, face_edges, edge_nodes, coordinates, face_links, face_ids, \
+        face_coordinates = result
+        self.assertIsInstance(edge_nodes, ndarray)
+        self.assertFalse((edge_nodes == -1).any())
+        self.assertEqual(face_nodes[0].shape[0], 15)
+        self.assertEqual((face_nodes[0] == -1).sum(), 2)
+        self.assertEqual((face_edges[0] == -1).sum(), 2)
+        self.assertEqual(face_nodes[0].shape, face_edges[0].shape)
+        self.assertNumpyAll(face_nodes[0], face_edges[0])
+        # tdk: add conversion back to multipolygon objects and test polygons are equal.
         tkk
 
     @pytest.mark.mpi4py

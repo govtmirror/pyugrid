@@ -50,6 +50,7 @@ def iter_edge_nodes(idx_nodes):
         # the last node pair requires linking back to the first node
         except IndexError:
             yld = (idx_nodes[-1], idx_nodes[0])
+
         yield yld
 
 
@@ -102,84 +103,72 @@ def get_variables(gm, pack=False, use_ragged_arrays=False):
     # holds the start and end nodes for each edge
     edge_nodes = deque()
 
-    # holds x and y node values
-    node_x = np.array([])
-    node_y = np.array([])
+    # holds node indices
     node_indices = np.array([])
 
     # flag to indicate if this is the first face encountered
     first = True
-    # global point index counter
-    idx_point = 0
-    # global edge index counter
-    idx_edge = 0
     # loop through each polygon
     for idx_face_nodes, (fid, record) in enumerate(gm.iter_records(return_uid=True)):
         # tdk: optimize
-        try:
-            coordinates = np.array(record['geom'].exterior.coords)
-            # Assert last coordinate is repeated for each polygon.
-            assert coordinates[0].tolist() == coordinates[-1].tolist()
-            # Remove this repeated coordinate.
-            coordinates = coordinates[0:-1, :]
-        except AttributeError:
-            # Likely a multipolygon.
-            coordinates = np.array([]).reshape(0, 2)
-            for e in record['geom']:
-                new_coordinates = np.array(e.exterior.coords)
-                # Assert last coordinate is repeated for each polygon.
-                assert new_coordinates[0].tolist() == new_coordinates[-1].tolist()
-                # Remove this repeated coordinate.
-                new_coordinates = new_coordinates[0:-1, :]
-                coordinates = np.vstack((coordinates, new_coordinates))
-
-        # just load everything if this is the first polygon
-        if first:
-            # store the point values.
-            for ii in range(coordinates.shape[0]):
-                coordinates_row = coordinates[ii, :]
-                # store the x and y coordinates
-                node_x = np.hstack((node_x, [coordinates_row[0]]))
-                node_y = np.hstack((node_y, [coordinates_row[1]]))
-                # increment the point index
-                idx_point += 1
-            # map the node identifiers for the face
-            range_point_idx = range(0, idx_point)
-
-            # Store the indices in the face nodes object array.
-            face_nodes[idx_face_nodes] = np.array(range_point_idx, dtype=np.int32)
-
-            node_indices = np.hstack((node_indices, range_point_idx))
-
-            # construct the edges. compress the node slice to remove any masked values at the tail.
-            for start_node_idx, end_node_idx in iter_edge_nodes(face_nodes[idx_face_nodes]):
-                edge_nodes.append((start_node_idx, end_node_idx))
-                idx_edge += 1
-
-            # map the edges to faces
-            face_edges[idx_face_nodes] = np.array(range(0, idx_edge), dtype=np.int32)
-
-            # switch the loop flag to indicate the first face has been dealt with
-            first = False
+        geom = record['geom']
+        if isinstance(geom, MultiPolygon):
+            itr = iter(geom)
+            n_elements = len(geom)
         else:
-            # holds new node coordinates for the face
-            new_face_nodes = deque()
+            itr = [geom]
+            n_elements = 1
 
-            # Only search neighboring faces if there are face links.
-            if face_links is not None:
-                neighbor_face_indices = face_links[idx_face_nodes]
+        for ctr_element, element in enumerate(itr):
+            current_coordinates = np.array(element.exterior.coords)
+            # Assert last coordinate is repeated for each polygon.
+            assert current_coordinates[0].tolist() == current_coordinates[-1].tolist()
+            # Remove this repeated coordinate.
+            current_coordinates = current_coordinates[0:-1, :]
+
+            # just load everything if this is the first polygon
+            if first:
+                # Use the current coordinates as the base coordinates.
+                coordinates = current_coordinates.copy()
+                # Store the indices in the face nodes object array.
+                node_indices = np.arange(coordinates.shape[0], dtype=np.int32)
+                # This index tracks the global coordinate location.
+                idx_point = coordinates.shape[0]
+                # Store the node indices in the face node index array.
+                face_nodes[idx_face_nodes] = node_indices.copy()
+                # Construct the edges.
+                edge_nodes = list(iter_edge_nodes(node_indices))
+                # This index tracks the global edge location.
+                idx_edge = len(edge_nodes)
+                # Map edges to faces.
+                face_edges[idx_face_nodes] = np.arange(idx_edge, dtype=np.int32)
+                # Switch the loop flag to indicate the first face has been dealt with.
+                first = False
             else:
-                neighbor_face_indices = np.array([])
+                # Only search neighboring faces if there are face links.
+                if face_links is not None:
+                    neighbor_face_indices = face_links[idx_face_nodes]
+                else:
+                    neighbor_face_indices = np.array([])
 
-            node_indices, node_x, node_y, idx_point = get_mapped_xy(face_nodes, node_indices, node_x, node_y,
-                                                                    coordinates, idx_point, neighbor_face_indices,
-                                                                    new_face_nodes, pack=pack)
+                res = get_mapped_xy(face_nodes, node_indices, coordinates, current_coordinates, idx_point,
+                                    neighbor_face_indices, pack=pack)
+                node_indices, coordinates, idx_point, new_face_nodes = res
 
-            # map the node indices for the face
-            face_nodes[idx_face_nodes] = np.array(new_face_nodes, dtype=np.int32)
 
-            # find and map the edges
-            idx_edge = get_mapped_edges(edge_nodes, face_edges, face_nodes, idx_face_nodes, idx_edge, pack=pack)
+                # Find and map the edge indices.
+                idx_edge, new_face_edges = get_mapped_edges(edge_nodes, new_face_nodes, idx_edge, pack=pack)
+
+                # If processing a mutlipolygon, and we are on the second or greater element, indicate the break with a
+                # -1 flag.
+                if n_elements > 1 and ctr_element != 0:
+                    new_face_nodes.appendleft(-1)
+                    new_face_edges.appendleft(-1)
+
+                # Update node and edge arrays to account for the new indices.
+                for arr, new_data in zip((face_nodes, face_edges), (new_face_nodes, new_face_edges)):
+                    new_data = np.array(new_data, dtype=np.int32)
+                    arr[idx_face_nodes] = np.hstack((arr[idx_face_nodes], new_data))
 
     # Convert object arrays to rectangular array if use_ragged_arrays is False.
     if not use_ragged_arrays:
@@ -188,7 +177,7 @@ def get_variables(gm, pack=False, use_ragged_arrays=False):
             new_arrays.append(get_rectangular_array_from_object_array(a, (a.shape[0], nmax_face_nodes)))
         face_links, face_nodes, face_edges = new_arrays
 
-    return face_nodes, face_edges, np.array(edge_nodes, dtype=np.int32), node_x, node_y, face_links, face_ids, \
+    return face_nodes, face_edges, np.array(edge_nodes, dtype=np.int32), coordinates, face_links, face_ids, \
            face_coordinates
 
 
@@ -201,22 +190,20 @@ def get_rectangular_array_from_object_array(target, shape):
     return face_links
 
 
-def get_mapped_xy(face_nodes, node_indices, node_x, node_y, coordinates, idx_point, neighbor_face_indices,
-                  new_face_nodes, pack=False):
-    for ii in range(coordinates.shape[0]):
+def get_mapped_xy(face_nodes, node_indices, coordinates, current_coordinates, idx_point, neighbor_face_indices,
+                  pack=False):
+    new_face_nodes = deque()
+    for ii in range(current_coordinates.shape[0]):
         # logic flag to indicate if the point has been found
         found = False
-        coordinates_row = coordinates[ii, :]
+        coordinates_row = current_coordinates[ii, :]
         if pack:
             # search the neighboring faces for matching nodes
             for neighbor_face_index in neighbor_face_indices.flat:
-
                 # search over the neighboring face's nodes
                 neighbor_face_node_indices = face_nodes[neighbor_face_index]
-
-                # for neighbor_face_node_index in compressed:
-                x_equal = np.isclose(coordinates_row[0], node_x[neighbor_face_node_indices])
-                y_equal = np.isclose(coordinates_row[1], node_y[neighbor_face_node_indices])
+                x_equal = np.isclose(coordinates_row[0], coordinates[neighbor_face_node_indices, 0])
+                y_equal = np.isclose(coordinates_row[1], coordinates[neighbor_face_node_indices, 1])
                 is_equal = np.logical_and(x_equal, y_equal)
                 if np.any(is_equal):
                     new_face_nodes.extend(node_indices[neighbor_face_node_indices][is_equal].tolist())
@@ -225,23 +212,20 @@ def get_mapped_xy(face_nodes, node_indices, node_x, node_y, coordinates, idx_poi
                     break
         # add the new node if it has not been found
         if not found:
-            # add the coordinates of the new point
-            node_x = np.hstack((node_x, coordinates_row[0]))
-            node_y = np.hstack((node_y, coordinates_row[1]))
+            coordinates = np.vstack((coordinates, coordinates_row))
             # append the index of this new point
             new_face_nodes.append(idx_point)
             # increment the point index
             node_indices = np.hstack((node_indices, idx_point))
             idx_point += 1
 
-    return node_indices, node_x, node_y, idx_point
+    return node_indices, coordinates, idx_point, new_face_nodes
 
 
-def get_mapped_edges(edge_nodes, face_edges, face_nodes, idx_face_nodes, idx_edge, pack=False):
+def get_mapped_edges(edge_nodes, face_nodes, idx_edge, pack=False):
     new_face_edges = deque()
 
-    to_itr = face_nodes[idx_face_nodes]
-    for start_node_idx, end_node_idx in iter_edge_nodes(to_itr):
+    for start_node_idx, end_node_idx in iter_edge_nodes(face_nodes):
         # flag to indicate if edge has been found
         found_edge = False
         # search existing edge-node combinations accounting for ordering
@@ -252,10 +236,7 @@ def get_mapped_edges(edge_nodes, face_edges, face_nodes, idx_face_nodes, idx_edg
             new_face_edges.append(idx_edge)
             idx_edge += 1
 
-    # update the face-edge mapping
-    face_edges[idx_face_nodes] = np.array(new_face_edges, dtype=np.int32)
-
-    return idx_edge
+    return idx_edge, new_face_edges
 
 
 def get_found_edge(edge_nodes, end_node_idx, found_edge, new_face_edges, start_node_idx):
@@ -490,10 +471,10 @@ class GeometryManager(object):
                 record['geom'] = shape(record['geometry'])
                 # Only use the geometry objects from here. Maintaining the list of coordinates is superfluous.
                 record.pop('geometry')
-            self._validate_update_record_(record)
+            self._validate_record_(record)
 
             # Counter-clockwise orientations required by clients such as ESMF Mesh regridding.
-            record['geom'] = get_oriented_geometry(record['geom'])
+            record['geom'] = format_geometry(record['geom'])
 
             if return_uid:
                 uid = record['properties'][self.name_uid]
@@ -506,7 +487,7 @@ class GeometryManager(object):
         gi = GeomCabinetIterator(path=self.path, uid=self.name_uid, select_uid=select_uid, slice=slice)
         return gi
 
-    def _validate_update_record_(self, record):
+    def _validate_record_(self, record):
         geom = record['geom']
 
         # This should happen before any buffering. The buffering check may result in a single polygon object.
@@ -514,31 +495,32 @@ class GeometryManager(object):
             msg = 'Only singlepart geometries allowed. Perhaps "ugrid.convert_multipart_to_singlepart" would be useful?'
             raise ValueError(msg)
 
-        try:
-            assert geom.is_valid
-        except AssertionError:
-            geom = geom.buffer(0)
-            assert geom.is_valid
-            record['geom'] = geom
 
-
-def get_oriented_geometry(geom):
-    new_element = geom
-
+def format_geometry(geom):
     if isinstance(geom, MultiPolygon):
         #tdk: test orientation of multipolgyon
         # Orient each element of a multi-geometry.
         new_element = []
         for idx, e in enumerate(geom):
-            if not e.exterior.is_ccw:
-                new_element.append(orient(e))
-            else:
-                new_element.append(e)
+            e = get_oriented_and_valid_geometry(e)
+            new_element.append(e)
         new_element = geom.__class__(new_element)
     elif isinstance(geom, Polygon):
-        if not geom.exterior.is_ccw:
-            new_element = orient(geom)
+        new_element = get_oriented_and_valid_geometry(geom)
     else:
         raise NotImplementedError(type(geom))
 
     return new_element
+
+
+def get_oriented_and_valid_geometry(geom):
+
+    if not geom.exterior.is_ccw:
+        geom = orient(geom)
+
+    try:
+        assert geom.is_valid
+    except AssertionError:
+        geom = geom.buffer(0)
+        assert geom.is_valid
+    return geom
