@@ -573,12 +573,14 @@ class UGrid(object):
             boundary_coordinates[i] = coords.mean(axis=0)
         self.boundary_coordinates = boundary_coordinates
 
-    def save_as_netcdf(self, filepath):
+    def save_as_netcdf(self, filepath, kwargs_dataset=None):
         """
         Save the ugrid object as a netcdf file.
 
         :param filepath: path to file you want o save to.  An existing one
                          will be clobbered if it already exists.
+        :param kwargs_dataset: Optional keyword arguments to dataset creation.
+        :type kwargs_dataset: dict
 
         Follows the convention established by the netcdf UGRID working group:
 
@@ -588,11 +590,14 @@ class UGrid(object):
         # TODO (bekozi): add convention global attribute?
         # TODO (bekozi): how to handle file compression?
         mesh_name = self.mesh_name
+        kwargs_dataset = kwargs_dataset or {}
+        kwargs_dataset['mode'] = 'w'
+        kwargs_dataset['clobber'] = True
 
         # FIXME: Why not use netCDF4.Dataset instead of renaming?
         from netCDF4 import Dataset as ncDataset
         # Create a new netcdf file.
-        with ncDataset(filepath, mode="w", clobber=True) as nclocal:
+        with ncDataset(filepath, **kwargs_dataset) as nclocal:
             # tdk: no need to create num_node and num_edge dimensions when writing ragged arrays
             nclocal.createDimension(mesh_name+'_num_node', len(self.nodes))
             if self._edges is not None:
