@@ -4,15 +4,9 @@ env:
   - CONDA_PYTHON_VERSION="2"
   - CONDA_PYTHON_VERSION="3"
 
-# tdk: enable master when merged
-branches:
-  only:
-    - flexible-mesh
-#    - master
-
 sudo: false
 
-install:
+before_install:
   - if [[ "$CONDA_PYTHON_VERSION" == "2" ]]; then
       wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh;
     else
@@ -22,32 +16,37 @@ install:
   - export PATH="$HOME/miniconda/bin:$PATH"
   - hash -r
   - conda config --set always_yes yes --set changeps1 no
-  - conda update -q conda
-  # Useful for debugging any issues with conda
+  - conda update conda
   - conda info -a
-  - yes | conda install conda-build jinja2
+  - conda install conda-build jinja2
+
+  # Hosts an "rtree" build.
   - conda config --add channels nesii/channel/ocgis
 
-  # Build and install.
-  - pushd conda-recipe
-  - conda build .
-  - yes | conda install `conda build . --output`
-  - yes | conda install pytest
-  - popd
+  # Used in conda "meta.yaml" for branch and repository agnostic git information.
+  - export CBUILD_PYUGRID_GIT_URL=`git config --get remote.origin.url`
+  - export CBUILD_PYUGRID_TAG=`git rev-parse --abbrev-ref HEAD`
+  - export CBUILD_PYUGRID_VERSION=travis
+
+  # Build the conda recipe.
+  - conda build conda-recipe/.
+
+  # Install test depedency.
+  - conda install pytest
+
+install:
+  - conda install pyugrid --use-local
 
 script:
   - export TEST_CMD="py.test --ignore=notebook_examples"
-
   # Test with mpi4py.
   - ${TEST_CMD}
   - mpiexec -n 2 py.test -m mpi4py --ignore=notebook_examples
-
   # Test w/out mpi4py.
-  - yes | conda remove mpi4py
+  - conda remove mpi4py
   - ${TEST_CMD}
-
   # Test w/out GIS interoperability dependencies.
-  - yes | conda remove shapely fiona rtree
+  - conda remove shapely fiona rtree
   # Test flexible mesh can import w/out optionals.
   - py.test test/test_flexible_mesh/test_init.py::test_imports_required
   # Test UGrid w/out optional dependencies.

@@ -1,17 +1,10 @@
-# tdk: return version
 package:
     name: pyugrid
-    version: flexible_mesh
-#    version: master
-#    version: 0.1.6
+    version: {{environ['CBUILD_PYUGRID_VERSION']}}
 
-# tdk: return to upstream
 source:
-    git_url: https://github.com/NESII/pyugrid
-    git_tag: flexible-mesh
-#    git_url: https://github.com/pyugrid/pyugrid
-#    git_tag: 0.1.6
-#    git_tag: master
+    git_url: {{environ['CBUILD_PYUGRID_GIT_URL']}}
+    git_tag: {{environ['CBUILD_PYUGRID_TAG']}}
 
 build:
     number: 0
