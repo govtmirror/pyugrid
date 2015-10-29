@@ -1,56 +1,43 @@
+sudo: false
 language: python
 
 env:
-  - CONDA_PYTHON_VERSION="2"
-  - CONDA_PYTHON_VERSION="3"
-
-sudo: false
+    - CONDA="python=2.7"
+    - CONDA="python=3.3"
+    - CONDA="python=3.4"
+    - CONDA="python=3.5"
 
 before_install:
-  - if [[ "$CONDA_PYTHON_VERSION" == "2" ]]; then
-      wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh;
-    else
-      wget http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
-    fi
-  - bash miniconda.sh -b -p $HOME/miniconda
-  - export PATH="$HOME/miniconda/bin:$PATH"
-  - hash -r
-  - conda config --set always_yes yes --set changeps1 no
-  - conda update conda
-  - conda info -a
-  - conda install conda-build jinja2
+    - wget http://bit.ly/miniconda -O miniconda.sh
+    - bash miniconda.sh -b -p $HOME/miniconda
+    - export PATH="$HOME/miniconda/bin:$PATH"
+    - conda update --all --yes
+    - travis_retry conda create --yes -n test $CONDA --file requirements.txt
+    - source activate test
+    - travis_retry conda install --yes pytest
 
-  # Hosts an "rtree" build.
-  - conda config --add channels nesii/channel/ocgis
+    # Create test environment for optional tests.
 
-  # Used in conda "meta.yaml" for branch and repository agnostic git information.
-  - export CBUILD_PYUGRID_GIT_URL=`git config --get remote.origin.url`
-  - export CBUILD_PYUGRID_TAG=`git rev-parse --abbrev-ref HEAD`
-  - export CBUILD_PYUGRID_VERSION=travis
+    # Hosts an "rtree" build.
+    - conda config --add channels nesii/channel/ocgis
+    - travis_retry conda create --yes -n test-optional $CONDA --file requirements-optional.txt
+    - source activate test-optional
+    - travis_retry conda install --yes pytest
 
-  # Build the conda recipe.
-  - conda build conda-recipe/.
-
-  # Install test depedency.
-  - conda install pytest
 
 install:
-  - conda install pyugrid --use-local
+    - mkdir files
 
 script:
-  - export TEST_CMD="py.test --ignore=notebook_examples"
-  # Test with mpi4py.
-  - ${TEST_CMD}
-  - mpiexec -n 2 py.test -m mpi4py --ignore=notebook_examples
-  # Test w/out mpi4py.
-  - conda remove mpi4py
-  - ${TEST_CMD}
-  # Test w/out GIS interoperability dependencies.
-  - conda remove shapely fiona rtree
-  # Test flexible mesh can import w/out optionals.
-  - py.test test/test_flexible_mesh/test_init.py::test_imports_required
-  # Test UGrid w/out optional dependencies.
-  - py.test --ignore=notebook_examples --ignore=test/test_flexible_mesh
+    # Run tests ignoring test files using optional dependencies.
+    - source activate test
+    - py.test --ignore=notebook_examples --ignore=test/test_flexible_mesh
+
+    # Run full test suite including optional dependencies.
+    - source activate test-optional
+    - py.test --ignore=notebook_examples
+    # Run MPI tests.
+    - mpiexec -n 2 py.test -m mpi4py --ignore=notebook_examples
 
 notifications:
     irc: "chat.freenode.net#renci"
