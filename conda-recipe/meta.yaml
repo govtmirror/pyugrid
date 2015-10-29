@@ -1,10 +1,10 @@
 package:
     name: pyugrid
-    version: {{environ['CBUILD_PYUGRID_VERSION']}}
+    version: {{environ.get('CBUILD_PYUGRID_VERSION', '0.1.6')}}
 
 source:
-    git_url: {{environ['CBUILD_PYUGRID_GIT_URL']}}
-    git_tag: {{environ['CBUILD_PYUGRID_TAG']}}
+    git_url: {{environ.get('CBUILD_PYUGRID_GIT_URL', 'https://github.com/pyugrid/pyugrid.git')}}
+    git_tag: {{environ['CBUILD_PYUGRID_TAG', '0.1.6']}}
 
 build:
     number: 0
