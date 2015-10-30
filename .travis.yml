@@ -18,10 +18,11 @@ before_install:
 
     # Create test environment for optional tests.
 
-    # Hosts an "rtree" build.
-    - conda config --add channels ioos
-    - travis_retry conda create --yes -n test-optional $CONDA --file requirements-optional.txt
+    # TODO: Once netCDF4 dependency issue solved with IOOS, change file to "requirements-optional.txt".
+    - travis_retry conda create --yes -n test-optional $CONDA shapely fiona "libgdal<2" mpi4py netcdf4 matplotlib scipy
     - source activate test-optional
+    # Workaround to avoid downgrading netCDF4.
+    - conda install --yes -c ioos rtree
     - travis_retry conda install --yes pytest
 
 
