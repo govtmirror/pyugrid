@@ -658,8 +658,13 @@ class UGrid(object):
 
                 has_ragged_arrays = False
                 try:
+                    fill_value = self.faces.fill_value
+                except AttributeError:
+                    fill_value = None
+                try:
                     face_nodes = nc_create_var(face_nodes_name, IND_DT,
-                                               (dim_num_face_name, dim_num_vertices_name),)
+                                               (dim_num_face_name, dim_num_vertices_name),
+                                               fill_value=fill_value)
                 except ValueError:
                     ragged_index_type = nclocal.createVLType(IND_DT, mesh_name + '_vltype')
                     face_nodes = nc_create_var(face_nodes_name, ragged_index_type, (dim_num_face_name,))
@@ -672,12 +677,19 @@ class UGrid(object):
                 face_nodes.start_index = 0
 
                 if self.face_face_connectivity is not None:
+
+                    try:
+                        fill_value = self.face_edge_connectivity.fill_value
+                    except AttributeError:
+                        fill_value = None
+
                     if has_ragged_arrays:
                         face_links = nc_create_var(mesh_name + "_face_links", ragged_index_type,
                                                    (dim_num_face_name,))
                     else:
                         face_links = nc_create_var(mesh_name + "_face_links", IND_DT,
-                                                   (dim_num_face_name, dim_num_vertices_name))
+                                                   (dim_num_face_name, dim_num_vertices_name),
+                                                   fill_value=fill_value)
 
                     # tdk: handle single element arrays
                     for idx in range(self.face_face_connectivity.shape[0]):
@@ -703,13 +715,20 @@ class UGrid(object):
                 edge_nodes.start_index = 0
 
                 if self.face_edge_connectivity is not None:
+
+                    try:
+                        fill_value = self.face_edge_connectivity.fill_value
+                    except AttributeError:
+                        fill_value = None
+
                     if has_ragged_arrays:
                         face_edge_connectivity = nc_create_var(face_edges_variable_name, ragged_index_type,
                                                                (dim_num_face_name,))
                     else:
                         face_edge_connectivity = nc_create_var(face_edges_variable_name, IND_DT,
-                                                               (dim_num_face_name, dim_num_vertices_name))
-                        face_edge_connectivity[:] = self.face_edge_connectivity
+                                                               (dim_num_face_name, dim_num_vertices_name),
+                                                               fill_value=fill_value)
+                    face_edge_connectivity[:] = self.face_edge_connectivity
                     face_edge_connectivity.cf_role = "face_edge_connecitivity"
                     face_edge_connectivity.long_name = "Maps every face to its edges."
                     face_edge_connectivity.start_index = 0
