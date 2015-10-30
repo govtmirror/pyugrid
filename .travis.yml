@@ -19,7 +19,7 @@ before_install:
     # Create test environment for optional tests.
 
     # Hosts an "rtree" build.
-    - conda config --add channels nesii/channel/ocgis
+    - conda config --add channels ioos
     - travis_retry conda create --yes -n test-optional $CONDA --file requirements-optional.txt
     - source activate test-optional
     - travis_retry conda install --yes pytest
