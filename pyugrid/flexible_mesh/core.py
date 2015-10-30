@@ -1,6 +1,6 @@
 import numpy as np
 
-from pyugrid import UGrid, DataSet
+from pyugrid import UGrid, UVar
 from pyugrid.flexible_mesh.mpi import MPI_RANK
 from pyugrid.ugrid import IND_DT
 
@@ -66,7 +66,7 @@ class FlexibleMesh(UGrid):
             nodes = np.hstack((node_x.reshape(-1, 1), node_y.reshape(-1, 1)))
             data_attrs = {'long_name': 'Face unique identifiers.'}
             # TODO (bekozi): necessary to use a dictionary here? key of dictionary is never used.
-            data = {'': DataSet(name_uid, location='face', data=face_ids, attributes=data_attrs)}
+            data = {'': UVar(name_uid, location='face', data=face_ids, attributes=data_attrs)}
             # TODO (bekozi): add boundaries, boundary_coordinates, and edge_coordinates
             ret = FlexibleMesh(nodes=nodes, faces=face_nodes, edges=edge_nodes, boundaries=None,
                                face_face_connectivity=face_links, face_edge_connectivity=face_edges,

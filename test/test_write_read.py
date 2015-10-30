@@ -14,6 +14,8 @@ import numpy as np
 
 from pyugrid.ugrid import UGrid, UVar
 from pyugrid.test_examples import two_triangles
+from test.utilities import chdir
+
 
 def test_with_faces():
     """
