@@ -57,7 +57,7 @@ class FlexibleMesh(UGrid):
         :rtype: :class:`pyugrid.flexible_mesh.core.FlexibleMesh`
         """
 
-        from helpers import GeometryManager, get_variables
+        from pyugrid.flexible_mesh.helpers import GeometryManager, get_variables
 
         gm = GeometryManager(name_uid, path=path, path_rtree=path_rtree)
         result = get_variables(gm, pack=pack)
@@ -92,7 +92,7 @@ class FlexibleMesh(UGrid):
         :rtype: dict
         """
 
-        from helpers import iter_records
+        from pyugrid.flexible_mesh.helpers import iter_records
 
         for record in iter_records(self.faces, self.nodes[:, 0], self.nodes[:, 1], datasets=self.data.values(),
                                    shapely_only=shapely_only):
@@ -112,7 +112,7 @@ class FlexibleMesh(UGrid):
         :type face_uid_name: str
         """
 
-        from helpers import flexible_mesh_to_fiona
+        from pyugrid.flexible_mesh.helpers import flexible_mesh_to_fiona
 
         if face_uid_name is not None:
             face_uid = self.data[face_uid_name]

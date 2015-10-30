@@ -22,7 +22,7 @@ before_install:
     - travis_retry conda create --yes -n test-optional $CONDA shapely fiona "libgdal<2" mpi4py netcdf4 matplotlib scipy
     - source activate test-optional
     # Workaround to avoid downgrading netCDF4.
-    - conda install --yes -c ioos rtree
+    - travis_retry conda install --yes -c ioos rtree
     - travis_retry conda install --yes pytest
 
 

@@ -25,7 +25,7 @@ class AbstractFlexibleMeshTest(TestCase):
                            ['single', self.tdata_records_single],
                            ['three', self.tdata_records_three]])
         ret = OrderedDict()
-        for k, v in mmo.iteritems():
+        for k, v in mmo.items():
             ret[k] = {'records': v[0], 'schema': v[1], 'name_uid': v[2]}
         return ret
 
@@ -158,7 +158,7 @@ class AbstractFlexibleMeshTest(TestCase):
         return itr_products_keywords(keywords, as_namedtuple=as_namedtuple)
 
     def tdata_iter_shapefile_paths(self):
-        for k, v in self.tdata_records.iteritems():
+        for k, v in self.tdata_records.items():
             path = self.get_temporary_file_path(k + '.shp')
             self.write_fiona(path, v['records'], v['schema'])
             yield v['name_uid'], path
@@ -189,7 +189,7 @@ def attr(*args, **kwargs):
     def wrap_ob(ob):
         for name in args:
             setattr(ob, name, True)
-        for name, value in kwargs.iteritems():
+        for name, value in kwargs.items():
             setattr(ob, name, value)
         return ob
 
@@ -205,7 +205,7 @@ def itr_products_keywords(keywords, as_namedtuple=False):
     if as_namedtuple:
         yld_tuple = namedtuple('ITesterKeywords', keywords.keys())
 
-    iterators = [itr_row(ki, vi) for ki, vi in keywords.iteritems()]
+    iterators = [itr_row(ki, vi) for ki, vi in keywords.items()]
     for dictionaries in itertools.product(*iterators):
         yld = {}
         for dictionary in dictionaries:

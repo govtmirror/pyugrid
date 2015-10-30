@@ -20,7 +20,7 @@ class TestFlexibleMesh(AbstractFlexibleMeshTest):
         out_shp_path = self.get_temporary_file_path('roundtrip.shp')
 
         keywords = dict(
-            path=shapefiles.iterkeys(),
+            path=shapefiles.keys(),
             mesh_name=('_default', 'foobar'),
             # allow_multipolygons=(True, False),
             pack=(True, False),
@@ -46,7 +46,7 @@ class TestFlexibleMesh(AbstractFlexibleMeshTest):
 
             # Test all faces are accounted for.
             found = False
-            for kk, v in nfaces.iteritems():
+            for kk, v in nfaces.items():
                 if kk in k.path:
                     self.assertEqual(res.faces.shape[0], v)
                     found = True
