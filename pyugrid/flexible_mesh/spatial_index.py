@@ -1,11 +1,10 @@
+from rtree import index
+from shapely.prepared import prep
 try:
     from itertools import izip
 except ImportError:
     # There is no izip in Python 3.
     izip = zip
-
-from rtree import index
-from shapely.prepared import prep
 
 
 class SpatialIndex(object):
