@@ -1,17 +1,17 @@
+import os
 from collections import deque, OrderedDict
 from copy import copy
-import os
 
-import numpy as np
 import fiona
+import numpy as np
 from shapely.geometry import shape, mapping, Polygon, MultiPolygon
 from shapely.geometry.base import BaseMultipartGeometry
 from shapely.geometry.polygon import orient
 
 from pyugrid.flexible_mesh.constants import PYUGRID_LINK_ATTRIBUTE_NAME
 from pyugrid.flexible_mesh.geom_cabinet import GeomCabinetIterator
-from pyugrid.flexible_mesh.mpi import MPI_RANK, create_slices, MPI_COMM, hgather, vgather, MPI_SIZE, dgather
 from pyugrid.flexible_mesh.logging_ugrid import log
+from pyugrid.flexible_mesh.mpi import MPI_RANK, create_slices, MPI_COMM, hgather, vgather, MPI_SIZE, dgather
 from pyugrid.flexible_mesh.spatial_index import SpatialIndex
 
 
@@ -337,11 +337,11 @@ def get_face_variables(gm):
 def get_mapped_face_links(face_ids, face_links):
     """
     :param face_ids: Vector of unique, integer face identifiers.
-    :type face_ids: ndarray
+    :type face_ids: :class:`numpy.ndarray`
     :param face_links: List of dictionaries mapping face unique identifiers to neighbor face unique identifiers.
     :type face_links: list
     :returns: A numpy object array with slots containing numpy integer vectors with values equal to neighbor indices.
-    :rtype: ndarray
+    :rtype: :class:`numpy.ndarray`
     """
 
     face_links = dgather(face_links)

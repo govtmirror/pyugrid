@@ -1,9 +1,9 @@
 import os
 
-import numpy as np
 import fiona
-from numpy.core.multiarray import ndarray
+import numpy as np
 import pytest as pytest
+from numpy.core.multiarray import ndarray
 from shapely.geometry import Polygon, shape, MultiPolygon, mapping, Point
 
 from pyugrid import DataSet, FlexibleMesh
@@ -133,7 +133,7 @@ class TestHelpers(AbstractFlexibleMeshTest):
             else:
                 self.assertIsNone(result)
 
-    def test_get_variables_multipart(self):
+    def test_get_variables_allow_multipart(self):
         """Test allowing multipolygons."""
 
         records, schema, name_uid = self.tdata_records_three
