@@ -145,8 +145,7 @@ class TestHelpers(AbstractFlexibleMeshTest):
         for e in gm.iter_records():
             self.assertEqual(len(e['geom']), 3)
         result = get_variables(gm, use_ragged_arrays=True, pack=False)
-        face_nodes, face_edges, edge_nodes, coordinates, face_links, face_ids, \
-        face_coordinates = result
+        face_nodes, face_edges, edge_nodes, coordinates, face_links, face_ids, face_coordinates = result
         self.assertIsInstance(edge_nodes, ndarray)
         self.assertFalse((edge_nodes == -1).any())
         self.assertEqual(face_nodes[0].shape[0], 15)
