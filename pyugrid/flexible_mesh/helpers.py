@@ -8,6 +8,7 @@ from shapely.geometry import shape, mapping, Polygon, MultiPolygon
 from shapely.geometry.base import BaseMultipartGeometry
 from shapely.geometry.polygon import orient
 
+from pyugrid.flexible_mesh import constants
 from pyugrid.flexible_mesh.constants import PYUGRID_LINK_ATTRIBUTE_NAME
 from pyugrid.flexible_mesh.geom_cabinet import GeomCabinetIterator
 from pyugrid.flexible_mesh.logging_ugrid import log
@@ -162,8 +163,8 @@ def get_variables(gm, pack=False, use_ragged_arrays=False):
                 # -1 flag.
                 if n_elements > 1 and ctr_element != 0:
                     is_processing_mulipart = True
-                    new_face_nodes.appendleft(-1)
-                    new_face_edges.appendleft(-1)
+                    new_face_nodes.appendleft(constants.PYUGRID_POLYGON_BREAK_VALUE)
+                    new_face_edges.appendleft(constants.PYUGRID_POLYGON_BREAK_VALUE)
                 else:
                     is_processing_mulipart = False
 

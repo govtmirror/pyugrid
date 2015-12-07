@@ -7,6 +7,7 @@ from numpy.core.multiarray import ndarray
 from shapely.geometry import Polygon, shape, MultiPolygon, mapping, Point
 
 from pyugrid import DataSet, FlexibleMesh
+from pyugrid.flexible_mesh import constants
 from pyugrid.flexible_mesh.constants import PYUGRID_LINK_ATTRIBUTE_NAME
 from pyugrid.flexible_mesh.geom_cabinet import GeomCabinetIterator
 from pyugrid.flexible_mesh.helpers import convert_multipart_to_singlepart, get_face_variables, get_variables, \
@@ -149,8 +150,8 @@ class TestHelpers(AbstractFlexibleMeshTest):
         self.assertIsInstance(edge_nodes, ndarray)
         self.assertFalse((edge_nodes == -1).any())
         self.assertEqual(face_nodes[0].shape[0], 15)
-        self.assertEqual((face_nodes[0] == -1).sum(), 2)
-        self.assertEqual((face_edges[0] == -1).sum(), 2)
+        self.assertEqual((face_nodes[0] == constants.PYUGRID_POLYGON_BREAK_VALUE).sum(), 2)
+        self.assertEqual((face_edges[0] == constants.PYUGRID_POLYGON_BREAK_VALUE).sum(), 2)
         self.assertEqual(face_nodes[0].shape, face_edges[0].shape)
         self.assertNumpyAll(face_nodes[0], face_edges[0])
         # tdk: RESUME: add conversion back to multipolygon objects and test polygons are equal.
