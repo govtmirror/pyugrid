@@ -50,12 +50,13 @@ class FlexibleMesh(UGrid):
         return ret
 
     @classmethod
-    def from_geometry_manager(cls, gm, mesh_name='mesh', pack=False, use_ragged_arrays=False):
+    def from_geometry_manager(cls, gm, mesh_name='mesh', pack=False, use_ragged_arrays=False, with_connectivity=True):
         # tdk: doc
-        return get_flexible_mesh(gm, mesh_name, pack, use_ragged_arrays)
+        return get_flexible_mesh(gm, mesh_name, pack, use_ragged_arrays, with_connectivity=with_connectivity)
 
     @classmethod
-    def from_shapefile(cls, path, name_uid, mesh_name='mesh', path_rtree=None, pack=False, use_ragged_arrays=False):
+    def from_shapefile(cls, path, name_uid, mesh_name='mesh', path_rtree=None, pack=False, use_ragged_arrays=False,
+                       with_connectivity=True):
         """
         Create a flexible mesh from a target shapefile.
 
@@ -83,7 +84,7 @@ class FlexibleMesh(UGrid):
         from helpers import GeometryManager
 
         gm = GeometryManager(name_uid, path=path, path_rtree=path_rtree)
-        ret = get_flexible_mesh(gm, mesh_name, pack, use_ragged_arrays)
+        ret = get_flexible_mesh(gm, mesh_name, pack, use_ragged_arrays, with_connectivity=with_connectivity)
 
         return ret
 

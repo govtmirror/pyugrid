@@ -1,18 +1,19 @@
+import itertools
+import os
+import shutil
+import subprocess
+import tempfile
 from abc import ABCMeta
 from collections import namedtuple, OrderedDict
 from contextlib import contextmanager
 from copy import deepcopy
-import os
-import shutil
-import tempfile
 from unittest import TestCase
-import itertools
 
-import netCDF4 as nc
 import fiona
+import netCDF4 as nc
+import numpy as np
 from shapely import wkt
 from shapely.geometry import box, mapping, shape
-import numpy as np
 
 
 class AbstractFlexibleMeshTest(TestCase):
@@ -133,6 +134,14 @@ class AbstractFlexibleMeshTest(TestCase):
 
     def get_temporary_file_path(self, fn):
         return os.path.join(self.path_current_tmp, fn)
+
+    @staticmethod
+    def ncdump(path, header_only=True):
+        cmd = ['ncdump']
+        if header_only:
+            cmd.append('-h')
+        cmd.append(path)
+        subprocess.check_call(cmd)
 
     @staticmethod
     @contextmanager

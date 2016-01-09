@@ -11,7 +11,7 @@ from shapely.geometry.polygon import orient
 from pyugrid.flexible_mesh import constants
 from pyugrid.flexible_mesh.constants import PYUGRID_LINK_ATTRIBUTE_NAME
 from pyugrid.flexible_mesh.geom_cabinet import GeomCabinetIterator
-from pyugrid.flexible_mesh.logging_ugrid import log
+from pyugrid.flexible_mesh.logging_ugrid import log, log_entry_exit
 from pyugrid.flexible_mesh.mpi import MPI_RANK, create_slices, MPI_COMM, hgather, vgather, MPI_SIZE, dgather
 from pyugrid.flexible_mesh.spatial_index import SpatialIndex
 
@@ -28,9 +28,12 @@ def convert_multipart_to_singlepart(path_in, path_out, new_uid_name=PYUGRID_LINK
     """
 
     with fiona.open(path_in) as source:
+        len_source = len(source)
+        log.info('Records to convert to singlepart: {}'.format(len_source))
         source.meta['schema']['properties'][new_uid_name] = 'int'
         with fiona.open(path_out, mode='w', **source.meta) as sink:
-            for record in source:
+            for ctr, record in enumerate(source, start=1):
+                log.debug('processing: {} of {}'.format(ctr, len_source))
                 geom = shape(record['geometry'])
                 if isinstance(geom, BaseMultipartGeometry):
                     for element in geom:
@@ -270,6 +273,7 @@ def iter_touching(si, gm, shapely_object):
             yield uid_target
 
 
+@log_entry_exit
 def get_face_variables(gm):
 
     if MPI_RANK == 0:
@@ -280,6 +284,7 @@ def get_face_variables(gm):
     section = MPI_COMM.scatter(sections, root=0)
 
     # Create a spatial index to find touching faces.
+    log.debug('getting spatial index (rank={})'.format(MPI_RANK))
     si = gm.get_spatial_index()
 
     face_ids = np.zeros(section[1] - section[0], dtype=np.int32)
@@ -291,7 +296,10 @@ def get_face_variables(gm):
 
     log.debug('section={0} (rank={1})'.format(section, MPI_RANK))
 
+    len_section = section[1] - section[0]
+
     for ctr, (uid_source, record_source) in enumerate(gm.iter_records(return_uid=True, slice=section)):
+        log.debug('processing {} of {} (rank={})'.format(ctr + 1, len_section, MPI_RANK))
         face_ids[ctr] = uid_source
         ref_object = record_source['geom']
 
@@ -534,7 +542,12 @@ def get_oriented_and_valid_geometry(geom):
 
 def flexible_mesh_to_esmf_format(fm, ds):
     """
+    Convert to an ESMF format NetCDF files. Only supports ragged arrays.
+
+    :param fm: Flexible mesh object to convert.
     :type fm: :class:`pyugrid.flexible_mesh.core.FlexibleMesh`
+    :param ds: An open netCDF4 dataset object.
+    :type ds: :class:`netCDF4.Dataset`
     """
     # tdk: doc
 

@@ -1,10 +1,10 @@
-import logging
 import functools
+import logging
 
 from pyugrid.flexible_mesh.mpi import MPI_RANK
 
-level = logging.ERROR
-# level = logging.DEBUG
+# level = logging.ERROR
+level = logging.DEBUG
 
 log = logging.getLogger('ugrid')
 log.parent = None
@@ -13,6 +13,10 @@ console.setLevel(level)
 console.setFormatter(logging.Formatter(fmt='[%(asctime)s] %(levelname)s: %(name)s: %(message)s',
                                        datefmt='%Y-%m-%d %H:%M:%S'))
 log.addHandler(console)
+
+#tdk: remove
+fh = logging.FileHandler('/tmp/pyugrid.log', mode='w')
+log.addHandler(fh)
 
 
 class log_entry_exit(object):

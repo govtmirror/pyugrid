@@ -1,10 +1,11 @@
-import fiona
-from numpy.core.multiarray import ndarray
-
 import os
-from numpy.ma import MaskedArray
+
+import fiona
 import pytest
+from numpy.core.multiarray import ndarray
+from numpy.ma import MaskedArray
 from shapely.geometry.base import BaseGeometry
+
 from pyugrid.flexible_mesh.core import FlexibleMesh
 from pyugrid.flexible_mesh.helpers import create_rtree_file, convert_multipart_to_singlepart, GeometryManager
 from pyugrid.flexible_mesh.mpi import MPI_RANK, MPI_COMM
@@ -78,7 +79,7 @@ class TestFlexibleMesh(AbstractFlexibleMeshTest):
                     mn = k.mesh_name
                 node_variable = '{}_face_nodes'.format(mn)
                 ncvar = ds.variables[node_variable]
-                if 'three' in k.path:
+                if 'three' in k.path and not k.use_ragged_arrays:
                     self.assertIsInstance(ncvar[:], MaskedArray)
                 else:
                     self.assertIsInstance(ncvar[:], ndarray)

@@ -40,20 +40,28 @@ class TestHelpers(AbstractFlexibleMeshTest):
                 geom = shape(record['geometry'])
                 self.assertIsInstance(geom, Polygon)
 
+    @pytest.mark.mpi4py
     def test_flexible_mesh_to_esmf_format(self):
         records, _, name_uid = self.tdata_records_three
         gm = GeometryManager(name_uid, records=records)
-        fm = FlexibleMesh.from_geometry_manager(gm, use_ragged_arrays=True)
-        path = self.get_temporary_file_path('out.nc')
-        with self.nc_scope(path, 'w') as ds:
-            flexible_mesh_to_esmf_format(fm, ds)
-        with self.nc_scope(path) as ds:
-            res = ds.variables['numElementConn'][:]
-            self.assertEqual(res.tolist(), [4, 3, 6])
-            res = ds.variables['elementConn'][:]
-            res = [e.tolist() for e in res.flat]
-            actual = [[0, 1, 2, 3], [4, 5, 6], [7, 8, 9, 10, 11, 12]]
-            self.assertEqual(res, actual)
+        fm = FlexibleMesh.from_geometry_manager(gm, use_ragged_arrays=True, with_connectivity=False)
+
+        # Variables are not necessary for ESMF format.
+        self.assertIsNone(fm.face_face_connectivity)
+        self.assertIsNone(fm.face_edge_connectivity)
+
+        if MPI_RANK == 0:
+            path = self.get_temporary_file_path('out.nc')
+            with self.nc_scope(path, 'w') as ds:
+                flexible_mesh_to_esmf_format(fm, ds)
+            self.ncdump(path)
+            with self.nc_scope(path) as ds:
+                res = ds.variables['numElementConn'][:]
+                self.assertEqual(res.tolist(), [4, 3, 6])
+                res = ds.variables['elementConn'][:]
+                res = [e.tolist() for e in res.flat]
+                actual = [[0, 1, 2, 3], [4, 5, 6], [7, 8, 9, 10, 11, 12]]
+                self.assertEqual(res, actual)
 
     @pytest.mark.mpi4py
     def test_get_face_variables(self):
