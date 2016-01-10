@@ -9,6 +9,9 @@ else:
 
 
 class DummyMPIComm(object):
+    def Barrier(self):
+        pass
+
     def bcast(self, *args, **kwargs):
         return args[0]
 

@@ -6,16 +6,20 @@ from pyugrid.flexible_mesh.mpi import MPI_RANK
 # level = logging.ERROR
 level = logging.DEBUG
 
-log = logging.getLogger('ugrid')
+log = logging.getLogger('pyugrid')
 log.parent = None
+formatter = logging.Formatter(fmt='[%(asctime)s] %(levelname)s: %(name)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
 console = logging.StreamHandler()
 console.setLevel(level)
-console.setFormatter(logging.Formatter(fmt='[%(asctime)s] %(levelname)s: %(name)s: %(message)s',
-                                       datefmt='%Y-%m-%d %H:%M:%S'))
-log.addHandler(console)
+console.setFormatter(formatter)
 
 #tdk: remove
 fh = logging.FileHandler('/tmp/pyugrid.log', mode='w')
+fh.setFormatter(formatter)
+fh.setLevel(level)
+
+log.addHandler(console)
 log.addHandler(fh)
 
 

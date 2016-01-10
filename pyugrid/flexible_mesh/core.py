@@ -133,10 +133,14 @@ class FlexibleMesh(UGrid):
         flexible_mesh_to_fiona(path, self.faces, self.nodes[:, 0], self.nodes[:, 1], face_uid=face_uid)
 
 
-def get_flexible_mesh(gm, mesh_name, pack, use_ragged_arrays):
+def get_flexible_mesh(gm, mesh_name, pack, use_ragged_arrays, with_connectivity=True):
     from helpers import get_variables
 
-    result = get_variables(gm, pack=pack, use_ragged_arrays=use_ragged_arrays)
+    if pack and not with_connectivity:
+        msg = 'Packing requires "with_connectivity=True".'
+        raise ValueError(msg)
+
+    result = get_variables(gm, pack=pack, use_ragged_arrays=use_ragged_arrays, with_connectivity=with_connectivity)
     if MPI_RANK == 0:
         face_nodes, face_edges, edge_nodes, nodes, face_links, face_ids, face_coordinates = result
         data_attrs = {'long_name': 'Face unique identifiers.'}

@@ -58,7 +58,8 @@ def iter_edge_nodes(idx_nodes):
         yield yld
 
 
-def get_variables(gm, pack=False, use_ragged_arrays=False):
+@log_entry_exit
+def get_variables(gm, pack=False, use_ragged_arrays=False, with_connectivity=True):
     """
     :param gm: The geometry manager containing geometries to convert to mesh variables.
     :type gm: :class:`pyugrid.flexible_mesh.helpers.GeometryManager`
@@ -86,9 +87,9 @@ def get_variables(gm, pack=False, use_ragged_arrays=False):
     """
     #tdk: update doc
     if len(gm) < MPI_SIZE:
-        raise ValueError('the number of geometries must be greater than or equal to the number of processes')
+        raise ValueError('The number of geometries must be greater than or equal to the number of processes.')
 
-    result = get_face_variables(gm)
+    result = get_face_variables(gm, with_connectivity=with_connectivity)
 
     if MPI_RANK == 0:
         face_links, nmax_face_nodes, face_ids, face_coordinates = result
@@ -113,7 +114,9 @@ def get_variables(gm, pack=False, use_ragged_arrays=False):
     # flag to indicate if this is the first face encountered
     first = True
     # loop through each polygon
+    log.debug('extracting {} total geometries (rank={})'.format(n_face, MPI_RANK))
     for idx_face_nodes, (fid, record) in enumerate(gm.iter_records(return_uid=True)):
+        log.debug('extracting {} of {} (rank={})'.format(idx_face_nodes + 1, n_face, MPI_RANK))
         # tdk: optimize
         geom = record['geom']
         if isinstance(geom, MultiPolygon):
@@ -181,6 +184,7 @@ def get_variables(gm, pack=False, use_ragged_arrays=False):
 
     # Convert object arrays to rectangular array if use_ragged_arrays is False.
     if not use_ragged_arrays:
+        log.debug('converting ragged arrays to rectangular arrays (rank={})'.format(MPI_RANK))
         new_arrays = []
         for a in (face_links, face_nodes, face_edges):
             new_arrays.append(get_rectangular_array_from_object_array(a, (a.shape[0], nmax_face_nodes)))
@@ -274,18 +278,22 @@ def iter_touching(si, gm, shapely_object):
 
 
 @log_entry_exit
-def get_face_variables(gm):
+def get_face_variables(gm, with_connectivity=True):
+
+    n_face = len(gm)
+    log.debug('number of faces is {} (rank={})'.format(n_face, MPI_RANK))
 
     if MPI_RANK == 0:
-        sections = create_slices(len(gm))
+        sections = create_slices(n_face)
     else:
         sections = None
 
     section = MPI_COMM.scatter(sections, root=0)
 
     # Create a spatial index to find touching faces.
-    log.debug('getting spatial index (rank={})'.format(MPI_RANK))
-    si = gm.get_spatial_index()
+    if with_connectivity:
+        log.debug('getting spatial index (rank={})'.format(MPI_RANK))
+        si = gm.get_spatial_index()
 
     face_ids = np.zeros(section[1] - section[0], dtype=np.int32)
     assert face_ids.shape[0] > 0
@@ -318,14 +326,15 @@ def get_face_variables(gm):
         if ncoords > max_face_nodes:
             max_face_nodes = ncoords
 
-        touching = deque()
-        for uid_target in iter_touching(si, gm, ref_object):
-            # If the objects only touch they are neighbors and may share nodes.
-            touching.append(uid_target)
-        # If nothing touches the faces, indicate this with a flag value.
-        if len(touching) == 0:
-            touching.append(-1)
-        face_links[uid_source] = touching
+        if with_connectivity:
+            touching = deque()
+            for uid_target in iter_touching(si, gm, ref_object):
+                # If the objects only touch they are neighbors and may share nodes.
+                touching.append(uid_target)
+            # If nothing touches the faces, indicate this with a flag value.
+            if len(touching) == 0:
+                touching.append(-1)
+            face_links[uid_source] = touching
 
     face_ids = MPI_COMM.gather(face_ids, root=0)
     max_face_nodes = MPI_COMM.gather(max_face_nodes)
@@ -338,7 +347,10 @@ def get_face_variables(gm):
 
         max_face_nodes = max(max_face_nodes)
 
-        face_links = get_mapped_face_links(face_ids, face_links)
+        if with_connectivity:
+            face_links = get_mapped_face_links(face_ids, face_links)
+        else:
+            face_links = None
 
         return face_links, max_face_nodes, face_ids, face_coordinates
 
@@ -540,6 +552,7 @@ def get_oriented_and_valid_geometry(geom):
     return geom
 
 
+@log_entry_exit
 def flexible_mesh_to_esmf_format(fm, ds):
     """
     Convert to an ESMF format NetCDF files. Only supports ragged arrays.

@@ -12,7 +12,7 @@ from pyugrid.flexible_mesh.constants import PYUGRID_LINK_ATTRIBUTE_NAME
 from pyugrid.flexible_mesh.geom_cabinet import GeomCabinetIterator
 from pyugrid.flexible_mesh.helpers import convert_multipart_to_singlepart, get_face_variables, get_variables, \
     iter_records, GeometryManager, create_rtree_file, flexible_mesh_to_esmf_format
-from pyugrid.flexible_mesh.mpi import MPI_RANK, MPI_SIZE
+from pyugrid.flexible_mesh.mpi import MPI_RANK, MPI_SIZE, MPI_COMM
 from pyugrid.flexible_mesh.spatial_index import SpatialIndex
 from test.test_flexible_mesh.base import AbstractFlexibleMeshTest
 
@@ -47,14 +47,15 @@ class TestHelpers(AbstractFlexibleMeshTest):
         fm = FlexibleMesh.from_geometry_manager(gm, use_ragged_arrays=True, with_connectivity=False)
 
         # Variables are not necessary for ESMF format.
-        self.assertIsNone(fm.face_face_connectivity)
-        self.assertIsNone(fm.face_edge_connectivity)
+        if MPI_RANK == 0:
+            self.assertIsNone(fm.face_face_connectivity)
+        else:
+            self.assertIsNone(fm)
 
         if MPI_RANK == 0:
             path = self.get_temporary_file_path('out.nc')
             with self.nc_scope(path, 'w') as ds:
                 flexible_mesh_to_esmf_format(fm, ds)
-            self.ncdump(path)
             with self.nc_scope(path) as ds:
                 res = ds.variables['numElementConn'][:]
                 self.assertEqual(res.tolist(), [4, 3, 6])
@@ -62,6 +63,11 @@ class TestHelpers(AbstractFlexibleMeshTest):
                 res = [e.tolist() for e in res.flat]
                 actual = [[0, 1, 2, 3], [4, 5, 6], [7, 8, 9, 10, 11, 12]]
                 self.assertEqual(res, actual)
+
+                for v in ds.variables.values():
+                    self.assertTrue(v[:].flatten().shape[0] > 1)
+
+        MPI_COMM.Barrier()
 
     @pytest.mark.mpi4py
     def test_get_face_variables(self):
@@ -76,6 +82,8 @@ class TestHelpers(AbstractFlexibleMeshTest):
             self.assertEqual(to_test, [[1], [0, 2], [1]])
         else:
             self.assertIsNone(result)
+
+        MPI_COMM.Barrier()
 
     def test_get_face_variables_single_and_disjoint(self):
         """Test with single and disjoint polygons."""
@@ -142,6 +150,8 @@ class TestHelpers(AbstractFlexibleMeshTest):
             else:
                 self.assertIsNone(result)
 
+        MPI_COMM.Barrier()
+
     def test_get_variables_allow_multipart(self):
         """Test allowing multipolygons."""
 
@@ -192,6 +202,8 @@ class TestHelpers(AbstractFlexibleMeshTest):
                 self.assertEqual(face_coordinates.shape, shp)
             else:
                 self.assertIsNone(result)
+
+        MPI_COMM.Barrier()
 
     def test_iter_records(self):
         Mesh2_face_nodes = np.array([[0, 2, 3, 4], [0, 2, 3, 4]])
