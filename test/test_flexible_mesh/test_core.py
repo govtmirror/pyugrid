@@ -25,7 +25,6 @@ class TestFlexibleMesh(AbstractFlexibleMeshTest):
             path=shapefiles.iterkeys(),
             mesh_name=('_default', 'foobar'),
             # allow_multipolygons=(True, False),
-            pack=(True, False),
             path_rtree=(None, '_create'),
             use_ragged_arrays=[False, True]
         )
@@ -45,7 +44,6 @@ class TestFlexibleMesh(AbstractFlexibleMeshTest):
                 rtree_gm = GeometryManager(name_uid, path=k.path)
                 create_rtree_file(rtree_gm, rtree_path)
                 kwargs['path_rtree'] = rtree_path
-            kwargs['pack'] = k.pack
             kwargs['use_ragged_arrays'] = k.use_ragged_arrays
 
             res = FlexibleMesh.from_shapefile(*args, **kwargs)

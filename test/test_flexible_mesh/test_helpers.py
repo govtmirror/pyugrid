@@ -133,10 +133,10 @@ class TestHelpers(AbstractFlexibleMeshTest):
         records, schema, name_uid = self.tdata_records_three
         self.write_fiona(shp_path_three_polygons, records, schema)
 
-        keywords = dict(pack=[True, False], use_ragged_arrays=[True, False])
+        keywords = dict(use_ragged_arrays=[True, False])
 
         for ctr, k in enumerate(self.iter_product_keywords(keywords)):
-            result = get_variables(gm, pack=k.pack, use_ragged_arrays=k.use_ragged_arrays)
+            result = get_variables(gm, use_ragged_arrays=k.use_ragged_arrays)
 
             if MPI_RANK == 0:
                 face_nodes, face_edges, edge_nodes, nodes, face_links, face_ids, face_coordinates = result
@@ -149,7 +149,7 @@ class TestHelpers(AbstractFlexibleMeshTest):
                 self.assertEqual(face_coordinates.shape, (3, 2))
 
                 # There are three shared nodes in this example.
-                actual = 10 if k.pack else 13
+                actual = 13
                 self.assertEqual(nodes.shape[0], actual)
 
                 out_shp = self.get_temporary_file_path('reconstructed.shp')
@@ -192,7 +192,7 @@ class TestHelpers(AbstractFlexibleMeshTest):
         gm = GeometryManager(name_uid, records=new_records, allow_multipart=True)
         for e in gm.iter_records():
             self.assertEqual(len(e['geom']), 3)
-        result = get_variables(gm, use_ragged_arrays=True, pack=False)
+        result = get_variables(gm, use_ragged_arrays=True)
         face_nodes, face_edges, edge_nodes, coordinates, face_links, face_ids, face_coordinates = result
         self.assertIsInstance(edge_nodes, ndarray)
         self.assertFalse((edge_nodes == -1).any())

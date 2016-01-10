@@ -57,6 +57,11 @@ def dgather(elements):
     return grow
 
 
+def ogather(elements):
+    ret = np.array(elements, dtype=object)
+    return ret
+
+
 def hgather(elements):
     n = sum([e.shape[0] for e in elements])
     fill = np.zeros(n, dtype=elements[0].dtype)
