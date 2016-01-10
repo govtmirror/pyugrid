@@ -37,3 +37,4 @@ class log_entry_exit(object):
         """Support instance methods."""
 
         return functools.partial(self.__call__, obj)
+
