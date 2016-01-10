@@ -50,12 +50,12 @@ class FlexibleMesh(UGrid):
         return ret
 
     @classmethod
-    def from_geometry_manager(cls, gm, mesh_name='mesh', pack=False, use_ragged_arrays=False, with_connectivity=True):
+    def from_geometry_manager(cls, gm, mesh_name='mesh', use_ragged_arrays=False, with_connectivity=True):
         # tdk: doc
-        return get_flexible_mesh(gm, mesh_name, pack, use_ragged_arrays, with_connectivity=with_connectivity)
+        return get_flexible_mesh(gm, mesh_name, use_ragged_arrays, with_connectivity=with_connectivity)
 
     @classmethod
-    def from_shapefile(cls, path, name_uid, mesh_name='mesh', path_rtree=None, pack=False, use_ragged_arrays=False,
+    def from_shapefile(cls, path, name_uid, mesh_name='mesh', path_rtree=None, use_ragged_arrays=False,
                        with_connectivity=True):
         """
         Create a flexible mesh from a target shapefile.
@@ -74,17 +74,13 @@ class FlexibleMesh(UGrid):
         :param path_rtree: Path to a serialized spatial index object created using ``rtree``. Use :func:`pyugrid.flexible_mesh.helpers.create_rtree_file`
          to create a persistent ``rtree`` spatial index file.
         :type path_rtree: str
-        :param pack: If ``True``, de-duplicate coordinate values by checking for shared nodes. This may dramatically
-         increase processing times especially for large shapefiles. File size reductions will vary with input shapefile
-         topology.
-        :type pack: bool
         :rtype: :class:`pyugrid.flexible_mesh.core.FlexibleMesh`
         """
         # tdk: update doc
         from helpers import GeometryManager
 
         gm = GeometryManager(name_uid, path=path, path_rtree=path_rtree)
-        ret = get_flexible_mesh(gm, mesh_name, pack, use_ragged_arrays, with_connectivity=with_connectivity)
+        ret = get_flexible_mesh(gm, mesh_name, use_ragged_arrays, with_connectivity=with_connectivity)
 
         return ret
 
@@ -133,14 +129,10 @@ class FlexibleMesh(UGrid):
         flexible_mesh_to_fiona(path, self.faces, self.nodes[:, 0], self.nodes[:, 1], face_uid=face_uid)
 
 
-def get_flexible_mesh(gm, mesh_name, pack, use_ragged_arrays, with_connectivity=True):
+def get_flexible_mesh(gm, mesh_name, use_ragged_arrays, with_connectivity=True):
     from helpers import get_variables
 
-    if pack and not with_connectivity:
-        msg = 'Packing requires "with_connectivity=True".'
-        raise ValueError(msg)
-
-    result = get_variables(gm, pack=pack, use_ragged_arrays=use_ragged_arrays, with_connectivity=with_connectivity)
+    result = get_variables(gm, use_ragged_arrays=use_ragged_arrays, with_connectivity=with_connectivity)
     if MPI_RANK == 0:
         face_nodes, face_edges, edge_nodes, nodes, face_links, face_ids, face_coordinates = result
         data_attrs = {'long_name': 'Face unique identifiers.'}

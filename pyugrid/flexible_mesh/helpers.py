@@ -47,19 +47,69 @@ def convert_multipart_to_singlepart(path_in, path_out, new_uid_name=PYUGRID_LINK
                     start += 1
 
 
-def iter_edge_nodes(idx_nodes):
-    for ii in range(len(idx_nodes)):
-        try:
-            yld = (idx_nodes[ii], idx_nodes[ii + 1])
-        # the last node pair requires linking back to the first node
-        except IndexError:
-            yld = (idx_nodes[-1], idx_nodes[0])
-
-        yield yld
+@log_entry_exit
+def get_coordinates_dict(gm, n_faces=None):
+    n_faces = n_faces or len(gm)
+    ret = OrderedDict()
+    n_coords = 0
+    for ctr, (fid, record) in enumerate(gm.iter_records(return_uid=True), start=1):
+        log.debug('extracting {} of {} (rank={})'.format(ctr, n_faces, MPI_RANK))
+        geom = record['geom']
+        if isinstance(geom, MultiPolygon):
+            itr = iter(geom)
+        else:
+            itr = [geom]
+        coordinates_list = []
+        for element in itr:
+            current_coordinates = np.array(element.exterior.coords)
+            # Assert last coordinate is repeated for each polygon.
+            assert current_coordinates[0].tolist() == current_coordinates[-1].tolist()
+            # Remove this repeated coordinate.
+            current_coordinates = current_coordinates[0:-1, :]
+            coordinates_list.append(current_coordinates)
+            n_coords += current_coordinates.shape[0]
+        ret[fid] = coordinates_list
+    return ret, n_coords
 
 
 @log_entry_exit
-def get_variables(gm, pack=False, use_ragged_arrays=False, with_connectivity=True):
+def get_coordinate_dict_variables(cdict, n_coords, polygon_break_value=None):
+    polygon_break_value = polygon_break_value or constants.PYUGRID_POLYGON_BREAK_VALUE
+    dtype_int = np.int32
+    face_nodes = np.zeros(len(cdict), dtype=object)
+    idx_start = 0
+    for idx_face_nodes, coordinates_list in enumerate(cdict.itervalues()):
+        if idx_face_nodes == 0:
+            coordinates = np.zeros((n_coords, 2), dtype=coordinates_list[0].dtype)
+            edge_nodes = np.zeros_like(coordinates, dtype=dtype_int)
+        for ctr, coordinates_element in enumerate(coordinates_list):
+            shape_coordinates_row = coordinates_element.shape[0]
+            idx_stop = idx_start + shape_coordinates_row
+
+            new_face_nodes = np.arange(idx_start, idx_stop, dtype=dtype_int)
+            edge_nodes[idx_start: idx_stop, :] = get_edge_nodes(new_face_nodes)
+            if ctr == 0:
+                face_nodes_element = new_face_nodes
+            else:
+                face_nodes_element = np.hstack((face_nodes_element, polygon_break_value))
+                face_nodes_element = np.hstack((face_nodes_element, new_face_nodes))
+            coordinates[idx_start:idx_stop, :] = coordinates_element
+            idx_start += shape_coordinates_row
+        face_nodes[idx_face_nodes] = face_nodes_element
+
+    return face_nodes, coordinates, edge_nodes
+
+
+def get_edge_nodes(face_nodes):
+    first = face_nodes.reshape(-1, 1)
+    second = first + 1
+    edge_nodes = np.hstack((first, second))
+    edge_nodes[-1, 1] = edge_nodes[0, 0]
+    return edge_nodes
+
+
+@log_entry_exit
+def get_variables(gm, use_ragged_arrays=False, with_connectivity=True):
     """
     :param gm: The geometry manager containing geometries to convert to mesh variables.
     :type gm: :class:`pyugrid.flexible_mesh.helpers.GeometryManager`
@@ -97,92 +147,13 @@ def get_variables(gm, pack=False, use_ragged_arrays=False, with_connectivity=Tru
         return
 
     # the number of faces
-    n_face = len(gm)
+    n_faces = len(gm)
 
-    # Variable-length arrays are stored in an object array.
-    face_nodes = np.zeros(n_face, dtype=object)
+    cdict, n_coords = get_coordinates_dict(gm, n_faces=n_faces)
+    face_nodes, coordinates, edge_nodes = get_coordinate_dict_variables(cdict, n_coords, polygon_break_value=constants.PYUGRID_POLYGON_BREAK_VALUE)
+    face_edges = face_nodes
+    face_ids = np.array(cdict.keys(), dtype=np.int32)
 
-    # the edge mapping has the same shape as the node mapping
-    face_edges = np.zeros_like(face_nodes)
-
-    # holds the start and end nodes for each edge
-    edge_nodes = deque()
-
-    # holds node indices
-    node_indices = np.array([])
-
-    # flag to indicate if this is the first face encountered
-    first = True
-    # loop through each polygon
-    log.debug('extracting {} total geometries (rank={})'.format(n_face, MPI_RANK))
-    for idx_face_nodes, (fid, record) in enumerate(gm.iter_records(return_uid=True)):
-        log.debug('extracting {} of {} (rank={})'.format(idx_face_nodes + 1, n_face, MPI_RANK))
-        # tdk: optimize
-        geom = record['geom']
-        if isinstance(geom, MultiPolygon):
-            itr = iter(geom)
-            n_elements = len(geom)
-        else:
-            itr = [geom]
-            n_elements = 1
-
-        for ctr_element, element in enumerate(itr):
-            current_coordinates = np.array(element.exterior.coords)
-            # Assert last coordinate is repeated for each polygon.
-            assert current_coordinates[0].tolist() == current_coordinates[-1].tolist()
-            # Remove this repeated coordinate.
-            current_coordinates = current_coordinates[0:-1, :]
-
-            # just load everything if this is the first polygon
-            if first:
-                # Use the current coordinates as the base coordinates.
-                coordinates = current_coordinates.copy()
-                # Store the indices in the face nodes object array.
-                node_indices = np.arange(coordinates.shape[0], dtype=np.int32)
-                # This index tracks the global coordinate location.
-                idx_point = coordinates.shape[0]
-                # Store the node indices in the face node index array.
-                face_nodes[idx_face_nodes] = node_indices.copy()
-                # Construct the edges.
-                edge_nodes = list(iter_edge_nodes(node_indices))
-                # This index tracks the global edge location.
-                idx_edge = len(edge_nodes)
-                # Map edges to faces.
-                face_edges[idx_face_nodes] = np.arange(idx_edge, dtype=np.int32)
-                # Switch the loop flag to indicate the first face has been dealt with.
-                first = False
-            else:
-                # Only search neighboring faces if there are face links.
-                if face_links is not None:
-                    neighbor_face_indices = face_links[idx_face_nodes]
-                else:
-                    neighbor_face_indices = np.array([])
-
-                res = get_mapped_xy(face_nodes, node_indices, coordinates, current_coordinates, idx_point,
-                                    neighbor_face_indices, pack=pack)
-                node_indices, coordinates, idx_point, new_face_nodes = res
-
-                # Find and map the edge indices.
-                idx_edge, new_face_edges = get_mapped_edges(edge_nodes, new_face_nodes, idx_edge, pack=pack)
-
-                # If processing a mutlipolygon, and we are on the second or greater element, indicate the break with a
-                # -1 flag.
-                if n_elements > 1 and ctr_element != 0:
-                    is_processing_mulipart = True
-                    new_face_nodes.appendleft(constants.PYUGRID_POLYGON_BREAK_VALUE)
-                    new_face_edges.appendleft(constants.PYUGRID_POLYGON_BREAK_VALUE)
-                else:
-                    is_processing_mulipart = False
-
-                # Update node and edge arrays to account for the new indices.
-                for arr, new_data in zip((face_nodes, face_edges), (new_face_nodes, new_face_edges)):
-                    new_data = np.array(new_data, dtype=np.int32)
-                    if is_processing_mulipart:
-                        arr[idx_face_nodes] = np.hstack((arr[idx_face_nodes], new_data))
-                    else:
-                        arr[idx_face_nodes] = new_data
-
-    # Convert object arrays to rectangular array if use_ragged_arrays is False.
     if not use_ragged_arrays:
         log.debug('converting ragged arrays to rectangular arrays (rank={})'.format(MPI_RANK))
         new_arrays = []
@@ -190,8 +161,7 @@ def get_variables(gm, pack=False, use_ragged_arrays=False, with_connectivity=Tru
             new_arrays.append(get_rectangular_array_from_object_array(a, (a.shape[0], nmax_face_nodes)))
         face_links, face_nodes, face_edges = new_arrays
 
-    return face_nodes, face_edges, np.array(edge_nodes, dtype=np.int32), coordinates, face_links, face_ids, \
-           face_coordinates
+    return face_nodes, face_edges, edge_nodes, coordinates, face_links, face_ids, face_coordinates
 
 
 def get_rectangular_array_from_object_array(target, shape):
