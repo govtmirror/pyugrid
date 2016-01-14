@@ -11,8 +11,7 @@ from pyugrid.flexible_mesh import constants
 from pyugrid.flexible_mesh.constants import PYUGRID_LINK_ATTRIBUTE_NAME
 from pyugrid.flexible_mesh.geom_cabinet import GeomCabinetIterator
 from pyugrid.flexible_mesh.helpers import convert_multipart_to_singlepart, get_face_variables, get_variables, \
-    iter_records, GeometryManager, create_rtree_file, flexible_mesh_to_esmf_format, get_coordinates_dict, \
-    get_coordinate_dict_variables
+    iter_records, GeometryManager, create_rtree_file, flexible_mesh_to_esmf_format, get_coordinate_dict_variables
 from pyugrid.flexible_mesh.mpi import MPI_RANK, MPI_SIZE, MPI_COMM
 from pyugrid.flexible_mesh.spatial_index import SpatialIndex
 from test.test_flexible_mesh.base import AbstractFlexibleMeshTest
@@ -70,14 +69,6 @@ class TestHelpers(AbstractFlexibleMeshTest):
 
         MPI_COMM.Barrier()
 
-    def test_get_coordinates_dict(self):
-        cdict, n_coords = self.get_get_coordinates_dict()
-        self.assertEqual(n_coords, 13560)
-        self.assertEqual(len(cdict), 51)
-        for v in cdict.itervalues():
-            self.assertGreater(len(v), 0)
-            self.assertIsInstance(v[0], ndarray)
-
     def test_get_coordinate_dict_variables(self):
         cdict, n_coords = self.get_get_coordinates_dict()
         polygon_break_value = -99
@@ -92,24 +83,24 @@ class TestHelpers(AbstractFlexibleMeshTest):
         self.assertEqual(np.unique(edge_nodes[:, 1]).shape[0], edge_nodes.shape[0])
         self.assertEqual(face_nodes[-1][-1], n_coords - 1)
 
-    def get_get_coordinates_dict(self):
-        #tdk: order
-        gm = GeometryManager('UGID', path=self.tdata_shapefile_path_state_boundaries, allow_multipart=True)
-        n_faces = len(gm)
-        cdict, n_coords = get_coordinates_dict(gm, n_faces=n_faces)
-        return cdict, n_coords
-
     @pytest.mark.mpi4py
     def test_get_face_variables(self):
         gm = GeometryManager('SPECIAL', records=self.tdata_records_three[0])
         result = get_face_variables(gm)
         if MPI_RANK == 0:
-            face_links, nmax_face_nodes, face_ids, face_coordinates = result
+            face_links, nmax_face_nodes, face_ids, face_coordinates, cdict, n_coords = result
             self.assertEqual(face_coordinates.shape, (3, 2))
             self.assertEqual(face_ids.tolist(), [100, 101, 102])
             self.assertEqual(nmax_face_nodes, 6)
             to_test = [f.tolist() for f in face_links.flat]
             self.assertEqual(to_test, [[1], [0, 2], [1]])
+
+            self.assertEqual(n_coords, 13)
+            self.assertEqual(len(cdict), 3)
+            for v in cdict.itervalues():
+                self.assertGreater(len(v), 0)
+                self.assertIsInstance(v[0], ndarray)
+
         else:
             self.assertIsNone(result)
 
@@ -121,7 +112,7 @@ class TestHelpers(AbstractFlexibleMeshTest):
         for records, schema, name_uid in [self.tdata_records_disjoint, self.tdata_records_single]:
             gm = GeometryManager(name_uid, records=records)
             result = get_face_variables(gm)
-            face_links, nmax_face_nodes, face_ids, face_coordinates = result
+            face_links, nmax_face_nodes, face_ids, face_coordinates, cdict, n_coords = result
             for f in face_links:
                 self.assertEqual(f.shape[0], 1)
                 self.assertEqual(f[0], -1)

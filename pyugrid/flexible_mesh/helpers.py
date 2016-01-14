@@ -46,30 +46,35 @@ def convert_multipart_to_singlepart(path_in, path_out, new_uid_name=PYUGRID_LINK
                     sink.write(record)
                     start += 1
 
+#tdk: remove
+# @log_entry_exit
+# def get_coordinates_dict(gm, n_faces=None):
+#     n_faces = n_faces or len(gm)
+#     cdict = OrderedDict()
+#     n_coords = 0
+#     for ctr, (fid, record) in enumerate(gm.iter_records(return_uid=True), start=1):
+#         log.debug('extracting {} of {} (rank={})'.format(ctr, n_faces, MPI_RANK))
+#         coordinates_list, n_coords = get_coordinates_list_and_update_n_coords(record, n_coords)
+#         cdict[fid] = coordinates_list
+#     return cdict, n_coords
 
-@log_entry_exit
-def get_coordinates_dict(gm, n_faces=None):
-    n_faces = n_faces or len(gm)
-    ret = OrderedDict()
-    n_coords = 0
-    for ctr, (fid, record) in enumerate(gm.iter_records(return_uid=True), start=1):
-        log.debug('extracting {} of {} (rank={})'.format(ctr, n_faces, MPI_RANK))
-        geom = record['geom']
-        if isinstance(geom, MultiPolygon):
-            itr = iter(geom)
-        else:
-            itr = [geom]
-        coordinates_list = []
-        for element in itr:
-            current_coordinates = np.array(element.exterior.coords)
-            # Assert last coordinate is repeated for each polygon.
-            assert current_coordinates[0].tolist() == current_coordinates[-1].tolist()
-            # Remove this repeated coordinate.
-            current_coordinates = current_coordinates[0:-1, :]
-            coordinates_list.append(current_coordinates)
-            n_coords += current_coordinates.shape[0]
-        ret[fid] = coordinates_list
-    return ret, n_coords
+
+def get_coordinates_list_and_update_n_coords(record, n_coords):
+    geom = record['geom']
+    if isinstance(geom, MultiPolygon):
+        itr = iter(geom)
+    else:
+        itr = [geom]
+    coordinates_list = []
+    for element in itr:
+        current_coordinates = np.array(element.exterior.coords)
+        # Assert last coordinate is repeated for each polygon.
+        assert current_coordinates[0].tolist() == current_coordinates[-1].tolist()
+        # Remove this repeated coordinate.
+        current_coordinates = current_coordinates[0:-1, :]
+        coordinates_list.append(current_coordinates)
+        n_coords += current_coordinates.shape[0]
+    return coordinates_list, n_coords
 
 
 @log_entry_exit
@@ -210,8 +215,15 @@ def get_face_variables(gm, with_connectivity=True):
 
     len_section = section[1] - section[0]
 
+    cdict = OrderedDict()
+    n_coords = 0
+
     for ctr, (uid_source, record_source) in enumerate(gm.iter_records(return_uid=True, slice=section)):
         log.debug('processing {} of {} (rank={})'.format(ctr + 1, len_section, MPI_RANK))
+
+        coordinates_list, n_coords = get_coordinates_list_and_update_n_coords(record_source, n_coords)
+        cdict[uid_source] = coordinates_list
+
         face_ids[ctr] = uid_source
         ref_object = record_source['geom']
 
@@ -241,13 +253,17 @@ def get_face_variables(gm, with_connectivity=True):
             face_links[uid_source] = touching
 
     face_ids = MPI_COMM.gather(face_ids, root=0)
-    max_face_nodes = MPI_COMM.gather(max_face_nodes)
-    face_links = MPI_COMM.gather(face_links)
-    face_coordinates = MPI_COMM.gather(np.array(face_coordinates))
+    max_face_nodes = MPI_COMM.gather(max_face_nodes, root=0)
+    face_links = MPI_COMM.gather(face_links, root=0)
+    face_coordinates = MPI_COMM.gather(np.array(face_coordinates), root=0)
+    cdict = MPI_COMM.gather(cdict, root=0)
+    n_coords = MPI_COMM.gather(n_coords, root=0)
 
     if MPI_RANK == 0:
         face_ids = hgather(face_ids)
         face_coordinates = vgather(face_coordinates)
+        cdict = dgather(cdict)
+        n_coords = sum(n_coords)
 
         max_face_nodes = max(max_face_nodes)
 
@@ -256,7 +272,7 @@ def get_face_variables(gm, with_connectivity=True):
         else:
             face_links = None
 
-        return face_links, max_face_nodes, face_ids, face_coordinates
+        return face_links, max_face_nodes, face_ids, face_coordinates, cdict, n_coords
 
 
 def get_mapped_face_links(face_ids, face_links):
