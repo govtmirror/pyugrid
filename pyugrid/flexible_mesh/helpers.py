@@ -101,7 +101,6 @@ def get_coordinate_dict_variables(cdict, n_coords, polygon_break_value=None):
             coordinates[idx_start:idx_stop, :] = coordinates_element
             idx_start += shape_coordinates_row
         face_nodes[idx_face_nodes] = face_nodes_element
-
     return face_nodes, coordinates, edge_nodes
 
 
