@@ -70,7 +70,10 @@ class TestHelpers(AbstractFlexibleMeshTest):
         MPI_COMM.Barrier()
 
     def test_get_coordinate_dict_variables(self):
-        cdict, n_coords = self.get_get_coordinates_dict()
+        gm = GeometryManager('UGID', path=self.tdata_shapefile_path_state_boundaries, allow_multipart=True)
+        result = get_face_variables(gm)
+        _, _, _, _, cdict, n_coords = result
+
         polygon_break_value = -99
         face_nodes, coordinates, edge_nodes = get_coordinate_dict_variables(cdict, n_coords,
                                                                             polygon_break_value=polygon_break_value)

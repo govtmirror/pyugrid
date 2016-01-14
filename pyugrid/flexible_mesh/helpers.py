@@ -147,14 +147,10 @@ def get_variables(gm, use_ragged_arrays=False, with_connectivity=True):
     result = get_face_variables(gm, with_connectivity=with_connectivity)
 
     if MPI_RANK == 0:
-        face_links, nmax_face_nodes, face_ids, face_coordinates = result
+        face_links, nmax_face_nodes, face_ids, face_coordinates, cdict, n_coords = result
     else:
         return
 
-    # the number of faces
-    n_faces = len(gm)
-
-    cdict, n_coords = get_coordinates_dict(gm, n_faces=n_faces)
     face_nodes, coordinates, edge_nodes = get_coordinate_dict_variables(cdict, n_coords, polygon_break_value=constants.PYUGRID_POLYGON_BREAK_VALUE)
     face_edges = face_nodes
     face_ids = np.array(cdict.keys(), dtype=np.int32)
