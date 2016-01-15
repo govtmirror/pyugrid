@@ -12,9 +12,7 @@ from __future__ import (absolute_import, division, print_function)
 
 import numpy as np
 
-from pyugrid import DataSet
-from .utilities import chdir
-from pyugrid.ugrid import UGrid
+from pyugrid.ugrid import UGrid, UVar
 from pyugrid.test_examples import two_triangles
 
 def test_with_faces():
@@ -62,9 +60,9 @@ def test_with_just_nodes_and_depths():
 
     depth_array = [1.0, 2.0, 3.0, 4.0]
 
-    depth = DataSet('depth',
+    depth = UVar('depth',
                     'node',
-                    [1.0, 2.0, 3.0, 4.0],
+                    np.array([1.0, 2.0, 3.0, 4.0]),
                     {'units':'m',
                      'positive':'down',
                      'standard_name' : "sea_floor_depth_below_geoid",

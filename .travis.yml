@@ -1,32 +1,19 @@
 language: python
 
 env:
-  - CONDA_PYTHON_VERSION="2"
-  - CONDA_PYTHON_VERSION="3"
+    - CONDA="python=2.7"
+    - CONDA="python=3.3"
+    - CONDA="python=3.4"
+    - CONDA="python=3.5"
 
-# tdk: enable master when merged
-branches:
-  only:
-    - ragged-arrays
-#    - master
-
-sudo: false
-
-install:
-  - if [[ "$CONDA_PYTHON_VERSION" == "2" ]]; then
-      wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh;
-    else
-      wget http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
-    fi
-  - bash miniconda.sh -b -p $HOME/miniconda
-  - export PATH="$HOME/miniconda/bin:$PATH"
-  - hash -r
-  - conda config --set always_yes yes --set changeps1 no
-  - conda update -q conda
-  # Useful for debugging any issues with conda
-  - conda info -a
-  - yes | conda install conda-build jinja2
-  - conda config --add channels nesii/channel/ocgis
+before_install:
+    - wget http://bit.ly/miniconda -O miniconda.sh
+    - bash miniconda.sh -b -p $HOME/miniconda
+    - export PATH="$HOME/miniconda/bin:$PATH"
+    - conda update --all --yes
+    - travis_retry conda create --yes -n test $CONDA --file requirements.txt
+    - source activate test
+    - travis_retry conda install --yes pytest
 
   # Build and install.
   - pushd conda-recipe
