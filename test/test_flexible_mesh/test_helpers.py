@@ -4,6 +4,7 @@ import fiona
 import numpy as np
 import pytest as pytest
 from numpy.core.multiarray import ndarray
+from shapely import wkt
 from shapely.geometry import Polygon, shape, MultiPolygon, mapping, Point
 
 from pyugrid import DataSet, FlexibleMesh
@@ -11,7 +12,8 @@ from pyugrid.flexible_mesh import constants
 from pyugrid.flexible_mesh.constants import PYUGRID_LINK_ATTRIBUTE_NAME
 from pyugrid.flexible_mesh.geom_cabinet import GeomCabinetIterator
 from pyugrid.flexible_mesh.helpers import convert_multipart_to_singlepart, get_face_variables, get_variables, \
-    iter_records, GeometryManager, create_rtree_file, flexible_mesh_to_esmf_format, get_coordinate_dict_variables
+    iter_records, GeometryManager, create_rtree_file, flexible_mesh_to_esmf_format, get_coordinate_dict_variables, \
+    get_split_array
 from pyugrid.flexible_mesh.mpi import MPI_RANK, MPI_SIZE, MPI_COMM
 from pyugrid.flexible_mesh.spatial_index import SpatialIndex
 from test.test_flexible_mesh.base import AbstractFlexibleMeshTest
@@ -55,11 +57,13 @@ class TestHelpers(AbstractFlexibleMeshTest):
         if MPI_RANK == 0:
             path = self.get_temporary_file_path('out.nc')
             with self.nc_scope(path, 'w') as ds:
-                flexible_mesh_to_esmf_format(fm, ds)
+                flexible_mesh_to_esmf_format(fm, ds, polygon_break_value=-80)
             with self.nc_scope(path) as ds:
                 res = ds.variables['numElementConn'][:]
                 self.assertEqual(res.tolist(), [4, 3, 6])
-                res = ds.variables['elementConn'][:]
+                element_conn = ds.variables['elementConn']
+                self.assertEqual(element_conn.polygon_break_value, -80)
+                res = element_conn[:]
                 res = [e.tolist() for e in res.flat]
                 actual = [[0, 1, 2, 3], [4, 5, 6], [7, 8, 9, 10, 11, 12]]
                 self.assertEqual(res, actual)
@@ -77,6 +81,8 @@ class TestHelpers(AbstractFlexibleMeshTest):
         polygon_break_value = -99
         face_nodes, coordinates, edge_nodes = get_coordinate_dict_variables(cdict, n_coords,
                                                                             polygon_break_value=polygon_break_value)
+        for f in face_nodes:
+            self.assertEqual(f.dtype, np.int32)
 
         self.assertEqual(coordinates.shape, (n_coords, 2))
         self.assertEqual(face_nodes.shape, (len(cdict),))
@@ -176,6 +182,13 @@ class TestHelpers(AbstractFlexibleMeshTest):
 
         MPI_COMM.Barrier()
 
+    def test_get_split_array(self):
+        arr = np.array([1, 2, 3, -100, 4, 5, 6, 7, -100, 4, 5, -100, 6])
+        splits = get_split_array(arr, -100)
+        actual = [ii.tolist() for ii in splits]
+        desired = [[1, 2, 3], [4, 5, 6, 7], [4, 5], [6]]
+        self.assertEqual(actual, desired)
+
     def test_get_variables_allow_multipart(self):
         """Test allowing multipolygons."""
 
@@ -195,7 +208,6 @@ class TestHelpers(AbstractFlexibleMeshTest):
         self.assertEqual((face_edges[0] == constants.PYUGRID_POLYGON_BREAK_VALUE).sum(), 2)
         self.assertEqual(face_nodes[0].shape, face_edges[0].shape)
         self.assertNumpyAll(face_nodes[0], face_edges[0])
-        # tdk: RESUME: add conversion back to multipolygon objects and test polygons are equal.
 
     @pytest.mark.mpi4py
     def test_get_variables_disjoint_and_single(self):
@@ -243,6 +255,25 @@ class TestHelpers(AbstractFlexibleMeshTest):
         self.assertEqual(records[0]['properties']['summer'], 67.9)
         self.assertEqual(records[1]['properties']['summer'], 68.9)
         self.assertEqual(len(records), 2)
+
+    def test_iter_records_multipart(self):
+        """Test with a multipart break flag."""
+
+        wkt1 = 'Polygon ((-0.78579234972677603 0.45573770491803278, -0.56721311475409841 0.50601092896174871, -0.45573770491803289 0.38142076502732236, -0.72896174863387997 0.15846994535519121, -0.8775956284153007 0.32896174863387984, -0.78579234972677603 0.45573770491803278))'
+        wkt2 = 'Polygon ((-0.32240437158469959 0.13005464480874318, -0.18032786885245922 0.13224043715846989, -0.10382513661202197 0.01857923497267755, -0.20000000000000018 -0.12131147540983611, -0.37049180327868858 -0.08852459016393444, -0.40109289617486343 0.04262295081967216, -0.32240437158469959 0.13005464480874318))'
+        multi = MultiPolygon([wkt.loads(w) for w in [wkt1, wkt2]])
+        record = {'geom': multi, 'properties': {'UGID': 10}}
+        gm = GeometryManager('UGID', records=[record], allow_multipart=True)
+        fm = FlexibleMesh.from_geometry_manager(gm)
+        node_x = fm.nodes[:, 0]
+        node_y = fm.nodes[:, 1]
+        itr = iter_records(fm.faces, node_x, node_y, shapely_only=True,
+                           polygon_break_value=constants.PYUGRID_POLYGON_BREAK_VALUE)
+        records = list(itr)
+        geom = records[0]['geom']
+        for part_actual, part_desired in zip(geom, multi):
+            self.assertPolygonAlmostEqual(part_actual, part_desired)
+        self.assertIsInstance(geom, MultiPolygon)
 
 
 class TestGeometryManager(AbstractFlexibleMeshTest):

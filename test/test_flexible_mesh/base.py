@@ -106,6 +106,8 @@ class AbstractFlexibleMeshTest(TestCase):
                     self.assertNumpyAll(arr1[idx], arr2[idx])
 
     def assertPolygonAlmostEqual(self, a, b):
+        self.assertTrue(a.is_valid)
+        self.assertTrue(b.is_valid)
         self.assertEqual(type(a), type(b))
         self.assertEqual(a.bounds, b.bounds)
         self.assertAlmostEqual(a.area, b.area)

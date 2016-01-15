@@ -1,6 +1,7 @@
 import numpy as np
 
 from pyugrid import UGrid, DataSet
+from pyugrid.flexible_mesh import constants
 from pyugrid.flexible_mesh.mpi import MPI_RANK
 from pyugrid.ugrid import IND_DT
 
@@ -56,7 +57,7 @@ class FlexibleMesh(UGrid):
 
     @classmethod
     def from_shapefile(cls, path, name_uid, mesh_name='mesh', path_rtree=None, use_ragged_arrays=False,
-                       with_connectivity=True):
+                       with_connectivity=True, allow_multipart=False):
         """
         Create a flexible mesh from a target shapefile.
 
@@ -79,7 +80,7 @@ class FlexibleMesh(UGrid):
         # tdk: update doc
         from helpers import GeometryManager
 
-        gm = GeometryManager(name_uid, path=path, path_rtree=path_rtree)
+        gm = GeometryManager(name_uid, path=path, path_rtree=path_rtree, allow_multipart=allow_multipart)
         ret = get_flexible_mesh(gm, mesh_name, use_ragged_arrays, with_connectivity=with_connectivity)
 
         return ret
@@ -102,7 +103,8 @@ class FlexibleMesh(UGrid):
         from helpers import iter_records
 
         for record in iter_records(self.faces, self.nodes[:, 0], self.nodes[:, 1], datasets=self.data.values(),
-                                   shapely_only=shapely_only):
+                                   shapely_only=shapely_only,
+                                   polygon_break_value=constants.PYUGRID_POLYGON_BREAK_VALUE):
             yield record
 
     def save_as_shapefile(self, path, face_uid_name=None):

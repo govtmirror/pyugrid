@@ -1,16 +1,17 @@
 import os
 
 import fiona
+import numpy as np
 import pytest
 from numpy.core.multiarray import ndarray
 from numpy.ma import MaskedArray
 from shapely.geometry.base import BaseGeometry
 
+from pyugrid.flexible_mesh import constants
 from pyugrid.flexible_mesh.core import FlexibleMesh
 from pyugrid.flexible_mesh.helpers import create_rtree_file, convert_multipart_to_singlepart, GeometryManager
 from pyugrid.flexible_mesh.mpi import MPI_RANK, MPI_COMM
 from test.test_flexible_mesh.base import AbstractFlexibleMeshTest
-
 
 class TestFlexibleMesh(AbstractFlexibleMeshTest):
 
@@ -116,6 +117,21 @@ class TestFlexibleMesh(AbstractFlexibleMeshTest):
 
         # Test variable names are consistent across ragged arrays.
         self.assertEqual(*[set(e) for e in variable_names.values()])
+
+    def test_from_shapefile_multipart(self):
+        """Test conversion allowing multipart geometries in the input shapefile."""
+
+        path = self.tdata_shapefile_path_state_boundaries
+        fm = FlexibleMesh.from_shapefile(path, 'UGID', allow_multipart=True)
+        self.assertEqual(fm.faces.min(), constants.PYUGRID_POLYGON_BREAK_VALUE)
+        path_out = self.get_temporary_file_path('foo.shp')
+        fm.save_as_shapefile(path_out, face_uid_name='UGID')
+        for record in fiona.open(path_out):
+            coords = record['geometry']['coordinates']
+            coords = np.array(coords)
+            self.assertNotIn(constants.PYUGRID_POLYGON_BREAK_VALUE, coords)
+        #tdk: RESUME: the polygon break value is still part of the coordinates
+        self.assertShapefileGeometriesAlmostEqual(path, path_out)
 
     def test_iter_records(self):
         path = self.get_temporary_file_path('out.shp')

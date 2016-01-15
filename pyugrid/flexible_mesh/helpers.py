@@ -100,7 +100,7 @@ def get_coordinate_dict_variables(cdict, n_coords, polygon_break_value=None):
                 face_nodes_element = np.hstack((face_nodes_element, new_face_nodes))
             coordinates[idx_start:idx_stop, :] = coordinates_element
             idx_start += shape_coordinates_row
-        face_nodes[idx_face_nodes] = face_nodes_element
+        face_nodes[idx_face_nodes] = face_nodes_element.astype(dtype_int)
     return face_nodes, coordinates, edge_nodes
 
 
@@ -295,9 +295,9 @@ def get_mapped_face_links(face_ids, face_links):
         new_face_links[idx] = to_fill
     return new_face_links
 
-# tdk: need to support multipolygons
+
 def flexible_mesh_to_fiona(out_path, face_nodes, node_x, node_y, crs=None, driver='ESRI Shapefile',
-                           indices_to_load=None, face_uid=None):
+                           indices_to_load=None, face_uid=None, polygon_break_value=None):
 
     if face_uid is None:
         properties = {}
@@ -306,21 +306,21 @@ def flexible_mesh_to_fiona(out_path, face_nodes, node_x, node_y, crs=None, drive
 
     schema = {'geometry': 'Polygon', 'properties': properties}
     with fiona.open(out_path, 'w', driver=driver, crs=crs, schema=schema) as f:
-        for feature in iter_records(face_nodes, node_x, node_y, indices_to_load=indices_to_load, datasets=[face_uid]):
+        for feature in iter_records(face_nodes, node_x, node_y, indices_to_load=indices_to_load, datasets=[face_uid],
+                                    polygon_break_value=polygon_break_value):
             feature['properties'][face_uid.name] = int(feature['properties'][face_uid.name])
             f.write(feature)
     return out_path
 
 
-def iter_records(face_nodes, node_x, node_y, indices_to_load=None, datasets=None, shapely_only=False):
+def iter_records(face_nodes, node_x, node_y, indices_to_load=None, datasets=None, shapely_only=False,
+                 polygon_break_value=None):
     if indices_to_load is None:
         feature_indices = range(face_nodes.shape[0])
     else:
         feature_indices = indices_to_load
 
     for feature_idx in feature_indices:
-        coordinates = deque()
-
         try:
             current_face_node = face_nodes[feature_idx, :]
         except IndexError:
@@ -334,10 +334,21 @@ def iter_records(face_nodes, node_x, node_y, indices_to_load=None, datasets=None
             # Likely not a masked array.
             nodes = current_face_node.flatten()
 
-        # Construct the geometry object by collecting node coordinates using indicies stored in "nodes".
-        for node_idx in nodes:
-            coordinates.append((node_x[node_idx], node_y[node_idx]))
-        polygon = Polygon(coordinates)
+        # Construct the geometry object by collecting node coordinates using indices stored in "nodes".
+        if polygon_break_value is not None and polygon_break_value in nodes:
+            itr = get_split_array(nodes, polygon_break_value)
+            has_multipart = True
+        else:
+            itr = [nodes]
+            has_multipart = False
+        coordinates = deque()
+        for sub in itr:
+            to_append = [(node_x[ni], node_y[ni]) for ni in sub.flat]
+            coordinates.append(to_append)
+        if has_multipart:
+            polygon = MultiPolygon([Polygon(c) for c in coordinates])
+        else:
+            polygon = Polygon(coordinates[0])
 
         # Collect properties if datasets are passed.
         properties = OrderedDict()
@@ -437,6 +448,23 @@ class GeometryManager(object):
             raise ValueError(msg)
 
 
+def get_split_array(arr, break_value):
+    """
+    :param arr: One-dimensional array.
+    :type arr: :class:`numpy.ndarray`
+    :type break_value: int
+    :return_type: sequence of :class:`numpy.ndarray`
+    """
+
+    where = np.where(arr == break_value)
+    split = np.array_split(arr, where[0])
+    ret = [None] * len(split)
+    ret[0] = split[0]
+    for idx in range(1, len(ret)):
+        ret[idx] = split[idx][1:]
+    return ret
+
+
 def format_geometry(geom):
     if isinstance(geom, MultiPolygon):
         #tdk: test orientation of multipolgyon
@@ -468,7 +496,7 @@ def get_oriented_and_valid_geometry(geom):
 
 
 @log_entry_exit
-def flexible_mesh_to_esmf_format(fm, ds):
+def flexible_mesh_to_esmf_format(fm, ds, polygon_break_value=None):
     """
     Convert to an ESMF format NetCDF files. Only supports ragged arrays.
 
@@ -494,6 +522,8 @@ def flexible_mesh_to_esmf_format(fm, ds):
 
     element_conn = ds.createVariable('elementConn', element_conn_vltype, (element_count.name,))
     element_conn.long_name = 'Node indices that define the element connectivity.'
+    if polygon_break_value is not None:
+        element_conn.polygon_break_value = polygon_break_value
     element_conn[:] = fm.faces
 
     num_element_conn = ds.createVariable('numElementConn', np.int64, (element_count.name,))
