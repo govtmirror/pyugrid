@@ -11,8 +11,8 @@ from __future__ import (absolute_import, division, print_function)
 import numpy as np
 import pytest
 
+from pyugrid import UVar
 from pyugrid.test_examples import two_triangles
-from pyugrid.ugrid import UVar
 
 
 def test_add_all_data():

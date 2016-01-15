@@ -11,8 +11,9 @@ from __future__ import (absolute_import, division, print_function)
 import netCDF4
 import numpy as np
 
+from pyugrid import UVar
 from pyugrid.test_examples import two_triangles, twenty_one_triangles
-from pyugrid.ugrid import UGrid, UVar
+from pyugrid.ugrid import UGrid
 
 
 # code to check netcdf files for stuff:

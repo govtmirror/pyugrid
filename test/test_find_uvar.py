@@ -15,8 +15,9 @@ import logging
 
 import numpy as np
 
+from pyugrid import UVar
 from pyugrid.test_examples import *
-from pyugrid.ugrid import UGrid, UVar
+from pyugrid.ugrid import UGrid
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger('pyugrid').setLevel(logging.DEBUG)

@@ -643,6 +643,7 @@ class UGrid(object):
                 if self.face_coordinates is not None:
                     mesh.face_coordinates = "{0}_face_lon {0}_face_lat".format(mesh_name) ##  optional attribute
             if self.face_edge_connectivity is not None:
+                face_edges_variable_name = mesh_name + "_face_edges"
                 # Optional attribute (requires edge_node_connectivity).
                 mesh.face_edge_connectivity = face_edges_variable_name
             if self.face_face_connectivity is not None:

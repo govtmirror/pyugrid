@@ -8,7 +8,7 @@ from shapely import wkt
 from shapely.geometry import Polygon, shape, MultiPolygon, mapping, Point
 from shapely.geometry.polygon import orient
 
-from pyugrid import DataSet, FlexibleMesh
+from pyugrid import FlexibleMesh, UVar
 from pyugrid.flexible_mesh import constants
 from pyugrid.flexible_mesh.constants import PYUGRID_LINK_ATTRIBUTE_NAME
 from pyugrid.flexible_mesh.geom_cabinet import GeomCabinetIterator
@@ -254,8 +254,8 @@ class TestHelpers(AbstractFlexibleMeshTest):
         Mesh2_face_nodes = np.array([[0, 2, 3, 4], [0, 2, 3, 4]])
         Mesh2_node_x = np.array([-0.53064513, -1.25698924, 0.14301075, 1.19552982, 0.54253644])
         Mesh2_node_y = np.array([0.53817207, -0.73010755, -0.73763442, -0.34940514, 0.73571628])
-        datasets = [DataSet('uid', location='face', data=[60, 61])]
-        datasets.append(DataSet('summer', location='face', data=[67.9, 68.9]))
+        datasets = [UVar('uid', location='face', data=[60, 61])]
+        datasets.append(UVar('summer', location='face', data=[67.9, 68.9]))
 
         itr = iter_records(Mesh2_face_nodes, Mesh2_node_x, Mesh2_node_y, datasets=datasets)
         records = list(itr)

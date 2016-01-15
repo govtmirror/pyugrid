@@ -1,9 +1,9 @@
 import numpy as np
 
-from pyugrid import UGrid, DataSet
 from pyugrid.flexible_mesh import constants
 from pyugrid.flexible_mesh.mpi import MPI_RANK
-from pyugrid.ugrid import IND_DT
+from pyugrid.ugrid import IND_DT, UGrid
+from pyugrid.uvar import UVar
 
 
 class FlexibleMesh(UGrid):
@@ -139,7 +139,7 @@ def get_flexible_mesh(gm, mesh_name, use_ragged_arrays, with_connectivity=True):
         face_nodes, face_edges, edge_nodes, nodes, face_links, face_ids, face_coordinates = result
         data_attrs = {'long_name': 'Face unique identifiers.'}
         # TODO (bekozi): necessary to use a dictionary here? key of dictionary is never used.
-        data = {'': DataSet(gm.name_uid, location='face', data=face_ids, attributes=data_attrs)}
+        data = {'': UVar(gm.name_uid, location='face', data=face_ids, attributes=data_attrs)}
         # TODO (bekozi): add boundaries, boundary_coordinates, and edge_coordinates
         ret = FlexibleMesh(nodes=nodes, faces=face_nodes, edges=edge_nodes, boundaries=None,
                            face_face_connectivity=face_links, face_edge_connectivity=face_edges,

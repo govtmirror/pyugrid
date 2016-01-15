@@ -16,6 +16,8 @@ from __future__ import (absolute_import, division, print_function)
 import netCDF4
 import numpy as np
 
+from pyugrid.uvar import UVar
+
 
 def find_mesh_names(nc):
     """
@@ -250,8 +252,7 @@ def load_grid_from_nc_dataset(nc, grid, mesh_name=None, load_data=True):
             attributes = {n: var.getncattr(n) for n in var.ncattrs()
                           if n not in ('location', 'coordinates', 'mesh')}
 
-            ds = DataSet(name, data=var[:],
-                         location=location, attributes=attributes)
+            ds = UVar(name, data=var[:], location=location, attributes=attributes)
             grid.add_data(ds)
 
 
