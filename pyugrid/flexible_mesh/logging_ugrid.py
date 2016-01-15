@@ -3,8 +3,8 @@ import logging
 
 from pyugrid.flexible_mesh.mpi import MPI_RANK
 
-# level = logging.ERROR
-level = logging.DEBUG
+level = logging.ERROR
+# level = logging.DEBUG
 
 log = logging.getLogger('pyugrid')
 log.parent = None

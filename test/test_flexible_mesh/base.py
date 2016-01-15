@@ -105,29 +105,28 @@ class AbstractFlexibleMeshTest(TestCase):
                 for idx in range(arr1.shape[0]):
                     self.assertNumpyAll(arr1[idx], arr2[idx])
 
-    def assertPolygonAlmostEqual(self, a, b):
-        self.assertTrue(a.is_valid)
-        self.assertTrue(b.is_valid)
-        self.assertEqual(type(a), type(b))
-        self.assertEqual(a.bounds, b.bounds)
-        self.assertAlmostEqual(a.area, b.area)
-        a_coords = np.array(a.exterior.coords)
-        b_coords = np.array(b.exterior.coords)
-        self.assertEqual(len(a_coords), len(b_coords))
-        self.assertAlmostEqual(a_coords.mean(), b_coords.mean())
+    def assertGeometriesAlmostEqual(self, actual, desired, strict=True):
+        self.assertTrue(actual.is_valid)
+        self.assertTrue(desired.is_valid)
+        self.assertEqual(type(actual), type(desired))
+        self.assertEqual(actual.bounds, desired.bounds)
+        self.assertTrue(actual.centroid.almost_equals(desired.centroid))
+        self.assertAlmostEqual(actual.area, desired.area)
+        if strict:
+            self.assertTrue(actual.almost_equals(desired))
 
-    def assertShapefileGeometriesAlmostEqual(self, lhs, rhs):
-        with fiona.open(lhs) as source:
+    def assertShapefileGeometriesAlmostEqual(self, actual, desired):
+        with fiona.open(actual) as source:
             polygons_original = [shape(e['geometry']) for e in source]
 
-        with fiona.open(rhs) as s1:
+        with fiona.open(desired) as s1:
             self.assertEqual(len(list(s1)), len(polygons_original))
             for r1 in s1:
                 found = False
                 g1 = shape(r1['geometry'])
                 for g2 in polygons_original:
                     try:
-                        self.assertPolygonAlmostEqual(g1, g2)
+                        self.assertGeometriesAlmostEqual(g1, g2)
                         found = True
                         break
                     except AssertionError:
@@ -185,6 +184,11 @@ class AbstractFlexibleMeshTest(TestCase):
             for r in records:
                 r['geometry'] = mapping(r['geom'])
                 sink.write(r)
+
+    def write_fiona_geometries(self, path, geoms, geom_type='Polygon'):
+        schema = {'geometry': geom_type, 'properties': {}}
+        records = [{'geom': g, 'properties': {}} for g in geoms]
+        self.write_fiona(path, records, schema)
 
     def setUp(self):
         self.path_current_tmp = tempfile.mkdtemp(prefix='{0}_test_'.format(self.key))

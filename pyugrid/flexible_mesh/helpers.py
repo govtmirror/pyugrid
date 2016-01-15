@@ -297,7 +297,7 @@ def get_mapped_face_links(face_ids, face_links):
 
 
 def flexible_mesh_to_fiona(out_path, face_nodes, node_x, node_y, crs=None, driver='ESRI Shapefile',
-                           indices_to_load=None, face_uid=None, polygon_break_value=None):
+                           indices_to_load=None, face_uid=None):
 
     if face_uid is None:
         properties = {}
@@ -307,7 +307,7 @@ def flexible_mesh_to_fiona(out_path, face_nodes, node_x, node_y, crs=None, drive
     schema = {'geometry': 'Polygon', 'properties': properties}
     with fiona.open(out_path, 'w', driver=driver, crs=crs, schema=schema) as f:
         for feature in iter_records(face_nodes, node_x, node_y, indices_to_load=indices_to_load, datasets=[face_uid],
-                                    polygon_break_value=polygon_break_value):
+                                    polygon_break_value=constants.PYUGRID_POLYGON_BREAK_VALUE):
             feature['properties'][face_uid.name] = int(feature['properties'][face_uid.name])
             f.write(feature)
     return out_path
@@ -341,14 +341,14 @@ def iter_records(face_nodes, node_x, node_y, indices_to_load=None, datasets=None
         else:
             itr = [nodes]
             has_multipart = False
-        coordinates = deque()
+        polygons = []
         for sub in itr:
-            to_append = [(node_x[ni], node_y[ni]) for ni in sub.flat]
-            coordinates.append(to_append)
+            coordinates = [(node_x[ni], node_y[ni]) for ni in sub.flat]
+            polygons.append(Polygon(coordinates))
         if has_multipart:
-            polygon = MultiPolygon([Polygon(c) for c in coordinates])
+            polygon = MultiPolygon(polygons)
         else:
-            polygon = Polygon(coordinates[0])
+            polygon = polygons[0]
 
         # Collect properties if datasets are passed.
         properties = OrderedDict()

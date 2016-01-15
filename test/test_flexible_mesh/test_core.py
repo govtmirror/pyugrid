@@ -130,7 +130,6 @@ class TestFlexibleMesh(AbstractFlexibleMeshTest):
             coords = record['geometry']['coordinates']
             coords = np.array(coords)
             self.assertNotIn(constants.PYUGRID_POLYGON_BREAK_VALUE, coords)
-        #tdk: RESUME: the polygon break value is still part of the coordinates
         self.assertShapefileGeometriesAlmostEqual(path, path_out)
 
     def test_iter_records(self):

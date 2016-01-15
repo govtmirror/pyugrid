@@ -6,6 +6,7 @@ import pytest as pytest
 from numpy.core.multiarray import ndarray
 from shapely import wkt
 from shapely.geometry import Polygon, shape, MultiPolygon, mapping, Point
+from shapely.geometry.polygon import orient
 
 from pyugrid import DataSet, FlexibleMesh
 from pyugrid.flexible_mesh import constants
@@ -176,7 +177,12 @@ class TestHelpers(AbstractFlexibleMeshTest):
                         to_write = {'geometry': mapping(target_polygon), 'properties': {}}
                         sink.write(to_write)
 
-                        self.assertPolygonAlmostEqual(actual_geom, target_polygon)
+                        actual = self.get_temporary_file_path('actual.shp')
+                        desired = self.get_temporary_file_path('desired.shp')
+                        self.write_fiona_geometries(actual, [actual_geom])
+                        self.write_fiona_geometries(desired, [target_polygon])
+
+                        self.assertGeometriesAlmostEqual(orient(actual_geom), orient(target_polygon))
             else:
                 self.assertIsNone(result)
 
@@ -209,6 +215,10 @@ class TestHelpers(AbstractFlexibleMeshTest):
         self.assertEqual(face_nodes[0].shape, face_edges[0].shape)
         self.assertNumpyAll(face_nodes[0], face_edges[0])
 
+        fm = FlexibleMesh.from_geometry_manager(gm)
+        path_shp = self.get_temporary_file_path('path.shp')
+        fm.save_as_shapefile(path_shp, face_uid_name=name_uid)
+
     @pytest.mark.mpi4py
     def test_get_variables_disjoint_and_single(self):
         """Test converting a shapefile that contains two disjoint elements and a single element."""
@@ -224,7 +234,6 @@ class TestHelpers(AbstractFlexibleMeshTest):
 
             if MPI_RANK == 0:
                 face_nodes, face_edges, edge_nodes, nodes, face_links, face_ids, face_coordinates = result
-
                 self.assertEqual(face_links.shape, face_nodes.shape)
 
                 for idx_f in range(face_links.shape[0]):
@@ -261,19 +270,44 @@ class TestHelpers(AbstractFlexibleMeshTest):
 
         wkt1 = 'Polygon ((-0.78579234972677603 0.45573770491803278, -0.56721311475409841 0.50601092896174871, -0.45573770491803289 0.38142076502732236, -0.72896174863387997 0.15846994535519121, -0.8775956284153007 0.32896174863387984, -0.78579234972677603 0.45573770491803278))'
         wkt2 = 'Polygon ((-0.32240437158469959 0.13005464480874318, -0.18032786885245922 0.13224043715846989, -0.10382513661202197 0.01857923497267755, -0.20000000000000018 -0.12131147540983611, -0.37049180327868858 -0.08852459016393444, -0.40109289617486343 0.04262295081967216, -0.32240437158469959 0.13005464480874318))'
-        multi = MultiPolygon([wkt.loads(w) for w in [wkt1, wkt2]])
-        record = {'geom': multi, 'properties': {'UGID': 10}}
-        gm = GeometryManager('UGID', records=[record], allow_multipart=True)
+        polygons = [wkt.loads(w) for w in [wkt1, wkt2]]
+        multi = MultiPolygon(polygons)
+        records = [{'geom': multi, 'properties': {'MID': 11}}]
+        # records = [{'geom': p, 'properties': {'UID': ii}} for ii, p in enumerate(polygons)]
+
+        # records = [{'geom': p, 'properties': {'UID': ii}} for ii, p in enumerate(polygons)]
+        # gm = GeometryManager('UID', records=records)
+        # fm = FlexibleMesh.from_geometry_manager(gm)
+        # for idx, record in enumerate(fm.iter_records(shapely_only=True)):
+        #     self.assertGeometriesAlmostEqual(record['geom'], records[idx]['geom'])
+        # path_singlepart = self.get_temporary_file_path('single_part.shp')
+        # fm.save_as_shapefile(path_singlepart, face_uid_name='UID')
+        #
+        #
+        # record = {'geom': multi, 'properties': {'UGID': 10}}
+        gm = GeometryManager('MID', records=records, allow_multipart=True)
         fm = FlexibleMesh.from_geometry_manager(gm)
         node_x = fm.nodes[:, 0]
         node_y = fm.nodes[:, 1]
         itr = iter_records(fm.faces, node_x, node_y, shapely_only=True,
                            polygon_break_value=constants.PYUGRID_POLYGON_BREAK_VALUE)
-        records = list(itr)
-        geom = records[0]['geom']
+        records2 = list(itr)
+        geom = records2[0]['geom']
+        path_multi = self.get_temporary_file_path('multi.shp')
+        self.write_fiona_geometries(path_multi, [geom])
         for part_actual, part_desired in zip(geom, multi):
-            self.assertPolygonAlmostEqual(part_actual, part_desired)
+            self.assertGeometriesAlmostEqual(part_actual, part_desired, strict=False)
         self.assertIsInstance(geom, MultiPolygon)
+
+        name_uid = 'MID'
+        gm = GeometryManager(name_uid, records=records, allow_multipart=True)
+        fm = FlexibleMesh.from_geometry_manager(gm)
+        self.assertIsNotNone(fm.data)
+        path_actual = self.get_temporary_file_path('actual.shp')
+        path_desired = self.get_temporary_file_path('desired.shp')
+        fm.save_as_shapefile(path_actual, face_uid_name=name_uid)
+        self.write_fiona_geometries(path_desired, [multi])
+        self.assertShapefileGeometriesAlmostEqual(path_actual, path_desired)
 
 
 class TestGeometryManager(AbstractFlexibleMeshTest):
