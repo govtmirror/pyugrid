@@ -8,11 +8,11 @@ designed to be run with pytest
 
 from __future__ import (absolute_import, division, print_function)
 
-import numpy as np
 import netCDF4
+import numpy as np
 
-from pyugrid.ugrid import UGrid, UVar
 from pyugrid.test_examples import two_triangles, twenty_one_triangles
+from pyugrid.ugrid import UGrid, UVar
 
 
 # code to check netcdf files for stuff:

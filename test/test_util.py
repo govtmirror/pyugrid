@@ -3,8 +3,11 @@ tests for the util module.
 """
 
 from __future__ import print_function
+
 import numpy as np
+
 from pyugrid import util
+
 
 class DummyArrayLike():
     """

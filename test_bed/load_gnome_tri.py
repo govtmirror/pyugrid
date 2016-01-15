@@ -4,9 +4,11 @@
 test to see how to write a custom ugrid file reader
 """
 
-import numpy as np
 import netCDF4
+import numpy as np
+
 import pyugrid
+
 
 def load_gnome_tri(filename):
     """

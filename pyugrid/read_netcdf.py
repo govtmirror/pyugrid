@@ -16,8 +16,6 @@ from __future__ import (absolute_import, division, print_function)
 import netCDF4
 import numpy as np
 
-from .uvar import UVar
-
 
 def find_mesh_names(nc):
     """

@@ -12,8 +12,8 @@ from __future__ import (absolute_import, division, print_function)
 
 import numpy as np
 
-from pyugrid.ugrid import UGrid, UVar
 from pyugrid.test_examples import two_triangles
+from pyugrid.ugrid import UGrid, UVar
 
 def test_with_faces():
     """

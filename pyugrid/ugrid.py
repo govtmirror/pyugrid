@@ -24,7 +24,6 @@ from . import read_netcdf
 # Used for simple locate_face test.
 # from py_geometry.cy_point_in_polygon import point_in_poly as point_in_tri.
 from .util import point_in_tri
-from .uvar import UVar
 
 # datatype used for indexes -- might want to change for 64 bit some day.
 IND_DT = np.int32

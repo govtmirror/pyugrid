@@ -4,8 +4,8 @@ assorted utilities useful for the tests
 
 from __future__ import (absolute_import, division, print_function)
 
-import os
 import contextlib
+import os
 
 
 @contextlib.contextmanager
