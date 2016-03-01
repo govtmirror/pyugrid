@@ -67,6 +67,8 @@ def get_coordinates_list_and_update_n_coords(record, n_coords):
         itr = [geom]
     coordinates_list = []
     for element in itr:
+        # Counter-clockwise orientations required by clients such as ESMF Mesh regridding.
+        element = get_oriented_and_valid_geometry(element)
         current_coordinates = np.array(element.exterior.coords)
         # Assert last coordinate is repeated for each polygon.
         assert current_coordinates[0].tolist() == current_coordinates[-1].tolist()
@@ -425,9 +427,6 @@ class GeometryManager(object):
                 record.pop('geometry')
             self._validate_record_(record)
 
-            # Counter-clockwise orientations required by clients such as ESMF Mesh regridding.
-            record['geom'] = format_geometry(record['geom'])
-
             if return_uid:
                 uid = record['properties'][self.name_uid]
                 yld = (uid, record)
@@ -463,23 +462,6 @@ def get_split_array(arr, break_value):
     for idx in range(1, len(ret)):
         ret[idx] = split[idx][1:]
     return ret
-
-
-def format_geometry(geom):
-    if isinstance(geom, MultiPolygon):
-        #tdk: test orientation of multipolgyon
-        # Orient each element of a multi-geometry.
-        new_element = []
-        for idx, e in enumerate(geom):
-            e = get_oriented_and_valid_geometry(e)
-            new_element.append(e)
-        new_element = geom.__class__(new_element)
-    elif isinstance(geom, Polygon):
-        new_element = get_oriented_and_valid_geometry(geom)
-    else:
-        raise NotImplementedError(type(geom))
-
-    return new_element
 
 
 def get_oriented_and_valid_geometry(geom):
