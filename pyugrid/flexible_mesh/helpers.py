@@ -529,4 +529,3 @@ def flexible_mesh_to_esmf_format(fm, ds, polygon_break_value=None):
     ds.gridType = 'unstructured'
     ds.version = '0.9'
     setattr(ds, coord_dim.name, "longitude latitude")
-
