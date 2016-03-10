@@ -3,10 +3,11 @@ import logging
 
 from pyugrid.flexible_mesh.mpi import MPI_RANK
 
-level = logging.ERROR
-# level = logging.DEBUG
+# level = logging.ERROR
+level = logging.DEBUG
 
 log = logging.getLogger('pyugrid')
+log._pyugrid_debugging = {}
 log.parent = None
 formatter = logging.Formatter(fmt='[%(asctime)s] %(levelname)s: %(name)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 

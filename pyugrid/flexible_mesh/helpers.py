@@ -68,14 +68,19 @@ def get_coordinates_list_and_update_n_coords(record, n_coords):
     coordinates_list = []
     for element in itr:
         # Counter-clockwise orientations required by clients such as ESMF Mesh regridding.
-        element = get_oriented_and_valid_geometry(element)
-        current_coordinates = np.array(element.exterior.coords)
+        exterior = element.exterior
+        if not exterior.is_ccw:
+            coords = list(exterior.coords)[::-1]
+        else:
+            coords = list(exterior.coords)
+        current_coordinates = np.array(coords)
         # Assert last coordinate is repeated for each polygon.
         assert current_coordinates[0].tolist() == current_coordinates[-1].tolist()
         # Remove this repeated coordinate.
         current_coordinates = current_coordinates[0:-1, :]
         coordinates_list.append(current_coordinates)
         n_coords += current_coordinates.shape[0]
+
     return coordinates_list, n_coords
 
 
@@ -216,7 +221,10 @@ def get_face_variables(gm, with_connectivity=True):
     n_coords = 0
 
     for ctr, (uid_source, record_source) in enumerate(gm.iter_records(return_uid=True, slice=section)):
-        log.debug('processing {} of {} (rank={})'.format(ctr + 1, len_section, MPI_RANK))
+        # log.debug('processing {} of {} (rank={})'.format(ctr + 1, len_section, MPI_RANK))
+        # tdk: remove
+        # if ctr != 8515:
+        #     continue
 
         coordinates_list, n_coords = get_coordinates_list_and_update_n_coords(record_source, n_coords)
         cdict[uid_source] = coordinates_list
@@ -465,20 +473,20 @@ def get_split_array(arr, break_value):
 
 
 def get_oriented_and_valid_geometry(geom):
-
-    if not geom.exterior.is_ccw:
-        geom = orient(geom)
-
     try:
         assert geom.is_valid
     except AssertionError:
         geom = geom.buffer(0)
         assert geom.is_valid
+
+    if not geom.exterior.is_ccw:
+        geom = orient(geom)
+
     return geom
 
 
 @log_entry_exit
-def flexible_mesh_to_esmf_format(fm, ds, polygon_break_value=None):
+def flexible_mesh_to_esmf_format(fm, ds, polygon_break_value=None, start_index=0):
     """
     Convert to an ESMF format NetCDF files. Only supports ragged arrays.
 
@@ -489,12 +497,30 @@ def flexible_mesh_to_esmf_format(fm, ds, polygon_break_value=None):
     """
     # tdk: doc
 
+    # tdk: remove me
+    # if MPI_RANK == 0:
+    #     import ipdb;ipdb.set_trace()
+    #     idx = fm.faces[69]
+    #     arr = fm.nodes[idx, :]
+    node_idx = fm.faces[69][278]
+    fm.nodes[node_idx][1] += 1e-6
+
+    # Transform ragged array to one-dimensional array.
+    num_element_conn_data = [e.shape[0] for e in fm.faces.flat]
+    length_connection_count = sum(num_element_conn_data)
+    element_conn_data = np.zeros(length_connection_count, dtype=fm.faces[0].dtype)
+    start = 0
+    for ii in fm.faces.flat:
+        element_conn_data[start: start + ii.shape[0]] = ii
+        start += ii.shape[0]
+
     # Dimensions #######################################################################################################
 
     node_count = ds.createDimension('nodeCount', fm.nodes.shape[0])
     element_count = ds.createDimension('elementCount', fm.faces.shape[0])
     coord_dim = ds.createDimension('coordDim', 2)
-    element_conn_vltype = ds.createVLType(fm.faces[0].dtype, 'elementConnVLType')
+    # element_conn_vltype = ds.createVLType(fm.faces[0].dtype, 'elementConnVLType')
+    connection_count = ds.createDimension('connectionCount', length_connection_count)
 
     # Variables ########################################################################################################
 
@@ -502,15 +528,16 @@ def flexible_mesh_to_esmf_format(fm, ds, polygon_break_value=None):
     node_coords.units = 'degrees'
     node_coords[:] = fm.nodes
 
-    element_conn = ds.createVariable('elementConn', element_conn_vltype, (element_count.name,))
+    element_conn = ds.createVariable('elementConn', element_conn_data.dtype, (connection_count.name,))
     element_conn.long_name = 'Node indices that define the element connectivity.'
     if polygon_break_value is not None:
         element_conn.polygon_break_value = polygon_break_value
-    element_conn[:] = fm.faces
+    element_conn.start_index = start_index
+    element_conn[:] = element_conn_data
 
-    num_element_conn = ds.createVariable('numElementConn', np.int64, (element_count.name,))
+    num_element_conn = ds.createVariable('numElementConn', np.int32, (element_count.name,))
     num_element_conn.long_name = 'Number of nodes per element.'
-    num_element_conn[:] = [e.shape[0] for e in fm.faces.flat]
+    num_element_conn[:] = num_element_conn_data
 
     center_coords = ds.createVariable('centerCoords', fm.face_coordinates.dtype, (element_count.name, coord_dim.name))
     center_coords.units = 'degrees'
