@@ -497,14 +497,6 @@ def flexible_mesh_to_esmf_format(fm, ds, polygon_break_value=None, start_index=0
     """
     # tdk: doc
 
-    # tdk: remove me
-    # if MPI_RANK == 0:
-    #     import ipdb;ipdb.set_trace()
-    #     idx = fm.faces[69]
-    #     arr = fm.nodes[idx, :]
-    node_idx = fm.faces[69][278]
-    fm.nodes[node_idx][1] += 1e-6
-
     # Transform ragged array to one-dimensional array.
     num_element_conn_data = [e.shape[0] for e in fm.faces.flat]
     length_connection_count = sum(num_element_conn_data)
