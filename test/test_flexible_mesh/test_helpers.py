@@ -58,7 +58,7 @@ class TestHelpers(AbstractFlexibleMeshTest):
         if MPI_RANK == 0:
             path = self.get_temporary_file_path('out.nc')
             with self.nc_scope(path, 'w') as ds:
-                flexible_mesh_to_esmf_format(fm, ds, polygon_break_value=-80)
+                flexible_mesh_to_esmf_format(fm, ds, polygon_break_value=-80, face_uid_name='SPECIAL')
             with self.nc_scope(path) as ds:
                 res = ds.variables['numElementConn'][:]
                 self.assertEqual(res.tolist(), [4, 3, 6])
@@ -66,8 +66,9 @@ class TestHelpers(AbstractFlexibleMeshTest):
                 self.assertEqual(element_conn.polygon_break_value, -80)
                 res = element_conn[:]
                 res = [e.tolist() for e in res.flat]
-                actual = [[0, 1, 2, 3], [4, 5, 6], [7, 8, 9, 10, 11, 12]]
+                actual = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
                 self.assertEqual(res, actual)
+                self.assertEqual(ds.variables['SPECIAL'][:].tolist(), [e['properties']['SPECIAL'] for e in records])
 
                 for v in ds.variables.values():
                     self.assertTrue(v[:].flatten().shape[0] > 1)

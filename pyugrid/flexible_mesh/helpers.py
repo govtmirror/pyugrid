@@ -486,7 +486,7 @@ def get_oriented_and_valid_geometry(geom):
 
 
 @log_entry_exit
-def flexible_mesh_to_esmf_format(fm, ds, polygon_break_value=None, start_index=0):
+def flexible_mesh_to_esmf_format(fm, ds, polygon_break_value=None, start_index=0, face_uid_name=None):
     """
     Convert to an ESMF format NetCDF files. Only supports ragged arrays.
 
@@ -534,6 +534,12 @@ def flexible_mesh_to_esmf_format(fm, ds, polygon_break_value=None, start_index=0
     center_coords = ds.createVariable('centerCoords', fm.face_coordinates.dtype, (element_count.name, coord_dim.name))
     center_coords.units = 'degrees'
     center_coords[:] = fm.face_coordinates
+
+    if face_uid_name is not None:
+        value = fm.data[face_uid_name].data
+        uid = ds.createVariable(face_uid_name, value.dtype, dimensions=(element_count.name,))
+        uid[:] = value
+        uid.long_name = 'Element unique identifier.'
 
     # tdk: compute area required?
     # element_area = ds.createVariable('elementArea', fm.nodes.dtype, (element_count.name,))
