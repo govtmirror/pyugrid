@@ -1,4 +1,3 @@
 numpy
 scipy
 netcdf4
-matplotlib
